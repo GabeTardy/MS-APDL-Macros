@@ -9,7 +9,10 @@ The scripts herein are provided as is. They contain many notes to myself and man
 
 ## Getting Started
 ### Installation
-Download the repository directly, or clone the repository.
+Download the repository directly, or clone the repository locally:
+```bash
+git clone https://github.com/GabeTardy/MS-APDL-Macros.git
+```
 
 ### Development Requirements
 
