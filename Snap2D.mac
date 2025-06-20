@@ -1,0 +1,243 @@
+! Configurable Sinusoidal Snapthrough - Beam Elements
+! Written by Gabriel Tardy
+! Arguments:
+! ARG1:
+!	- 0: Static (default)
+!	- 1: Modal+transient
+! ARG2:
+!	- 0: Load+Pull (single-cycle) (default)
+!	- 1: Load+Load (double-cycle)
+
+!!- Setup
+rs ! clearing macro
+/rep ! replot screen
+/pbc,all,,1 ! setup view options
+/psf,pres,norm,2,1,on ! Show pressures on model (normal)
+/psf,pres,tanx,2,1,on ! Show pressures on model (tanx)
+/psf,pres,tany,2,1,on ! Show pressures on model (tany)
+/eshape,1 ! show true cross-sections
+/number,0 ! Make colors represent materials and show the material number
+/pnum,mat,1
+/efacet,4 ! show more accurate shell plots with mid-nodes (technical: require apdl to plot 4 facets/edge)
+view,side ! Show isometric view
+/prep7
+!-!
+
+!!- Inputs
+m = 3/4
+n = 2
+lambda = 1/50 
+a0 = 1
+zeta = 1/5
+tau = 80
+
+k = 2000/tau ! iteration resolution constant. higher = better resolution, longer time taken to simulate
+fps = 60
+
+Ex = 100e6 ! psi
+prxy = 0.0 
+rho = 0.0975
+
+pi = 3.1415926535
+
+! Dimensioning
+l = a0/lambda
+ndiv = l*4
+h = a0*(3*m)**(0.5)
+b = h*2
+Izz = b*(h**3)/12
+Ar = b*h
+q0 = n*Ex*Izz*a0*(pi/l)**4
+!-!
+
+!!- Element Model
+et,1,189 ! SHELL281
+sectype,1,beam,rect
+secdata,h,b
+!-!
+
+!!- Material Model
+mp,ex,1,Ex
+mp,prxy,1,prxy
+mp,dens,1,rho
+!-!
+
+!!- Physical Model
+seltol,0.001 ! setup selection tolerance (used later for constraints)
+
+sinarc,l,ndiv,a0 ! setup sine arc, l long, with ndiv divisions, and a0 high.
+
+! show progress
+lplot
+/replot
+/wait,0.5
+!-!
+
+!!- Meshing
+lesize,all,,,1
+lmesh,all
+eplot
+/replot
+/wait,0.5
+!-!
+
+!!- Apply Pin-Pin Boundary Conditions
+d,NODE(0,0,0),ux,0,,,,uy,uz,rotx,roty
+d,NODE(l,0,0),ux,0,,,,uy,uz,rotx,roty
+!-!
+
+!!- Perform Analyses
+*if,ARG1,eq,1,then ! (modal+)transient analysis
+	/solu
+	antype,modal
+	mxpand,0,,,0
+	lumpm,0
+	pstres,0
+	modopt,lanb,5,0,0,,off
+	solve
+
+	*get,firstModeFreq,mode,1,freq
+
+	dt = 1/(k*firstModeFreq)
+
+	!omega_ = firstModeFreq*2*pi
+	omega_ = (pi/l)**2*(Ex*Izz/rho/Ar)**(0.5)
+	massDamping_ = zeta*omega_
+	t0_ = tau/omega_
+
+	! Step 7: solve, dynamic (get dynamic response)
+	eplot 
+	/replot
+
+	*msg,ui,omega_,massDamping_,t0_,dt
+	Omega: %g, Alpha: %g, t0: %g, dt: %g
+
+	finish
+	/solu
+	antype,transient
+	nlgeom,1
+	deltim,dt
+	alphad,massDamping_
+	betad,0
+	kbc,0
+	lumpm,0
+	outres,all,all
+
+	*if,ARG2,eq,0,then
+		*msg,ui,3*n*t0_
+		Total Expected TIME: %g
+	
+		! Place Load Steps
+		sinloadbeam,q0,l,1
+		time,1*n*t0_
+		lswrite,1
+		/wait,0.5
+
+		sinloadbeam,-q0/2,l,1
+		time,5/2*n*t0_
+		lswrite,2
+
+		sinloadbeam,0,l,1
+		time,3*n*t0_
+		lswrite,3
+
+		! Solve
+		lssolve,1,3,1
+	*else
+		*msg,ui,4*n*t0_
+		Total Expected TIME: %g
+		
+		! Place Load Steps
+		sinloadbeam,q0,l,1
+		time,1*n*t0_
+		lswrite,1
+		/wait,0.5
+
+		sinloadbeam,0,l,1
+		time,2*n*t0_
+		lswrite,2
+
+		sinloadbeam,q0,l,1
+		time,3*n*t0_
+		lswrite,3
+
+		sinloadbeam,0,l,1
+		time,4*n*t0_
+		lswrite,4
+
+		! Solve
+		lssolve,1,4,1
+	*endif
+*else
+	! Place Load
+	sinloadbeam,q0,l,1
+	/wait,0.5
+	
+	/solu
+	antype,static
+	nlgeom,on
+	nsubst,50
+	time,1
+	arclen,on,1
+	autots,off
+	outres,all,all
+	solve
+*endif
+!-!
+
+!!- Plot Results
+/post1
+set,first
+view,side
+
+! to show contour plot of displacement
+/dscale,all,auto
+plnsol,u,y,0,1
+/wait,5
+!-!
+
+!!- Plot Displacement Graph
+/post26
+nsol,2,NODE(l/2,a0,b/2),u,y,UY ! load the nodal displacement solution at the center of the arch to time-hist variable 2
+plvar,2
+/wait,5
+!-!
+
+!!- Export Results to Nondimensionalizer
+vget,time,1 
+vget,dispy,2
+
+*if,ARG1,eq,1,then
+	*cfopen,'geom2DT','csv'
+	*vwrite,'a0','E','I','L','n','p','A','t0'
+%C,%C,%C,%C,%C,%C,%C,%C
+	*vwrite,a0,Ex,Izz,l,n,omega_,b*h,t0_
+%G,%G,%G,%G,%G,%G,%G,%G
+	*cfclos
+
+	*cfopen,'results2DT','csv'
+	*vwrite,'t','uz'
+%C,%C
+*else
+	*cfopen,'geom2D','csv'
+	*vwrite,'a0','E','I','L','q0','m','n'
+%C,%C,%C,%C,%C,%C,%C
+	*vwrite,a0,Ex,Izz,l,q0,m,n
+%G,%G,%G,%G,%G,%G,%G
+	*cfclos
+
+	*cfopen,'results2D','csv'
+	*vwrite,'P','uz'
+%C,%C
+*endif
+
+*vwrite,time(1),dispy(1) 
+%G,%G 
+*cfclos
+!-!
+
+*if,ARG3,eq,1,then
+snapanim,ARG2
+*endif
+
+*status,PRM_

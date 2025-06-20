@@ -1,0 +1,79 @@
+rs
+
+load = 100
+
+csn,10,10,1,1,0.25,0.25,2,0
+
+et,1,189
+sectype,1,beam,rect
+! thickness in x-y plane, thickness in z dir
+secdata,0.1,0.1
+mp,ex,1,10000e3
+mp,prxy,1,0.3
+
+/eshape,1
+lmesh,all
+
+! select rhs
+nsel,s,loc,y,csnMaxY,csnMaxY
+nplot
+
+! tension
+f,all,fy,load
+
+! select lhs
+nsel,s,loc,y,0,0
+nplot
+
+! fixed end
+d,all,all
+
+! select all
+nsel,all
+
+! set view options
+/pbc,all,,1
+/psf,pres,norm,1,0,1
+eplot
+/wait,1
+
+/solu
+nlgeom,on
+nsubst,50
+time,1
+arclen,on,1
+autots,off
+outres,all,all
+solve
+
+/post1
+set,last
+plns,u,x
+
+dxT = UY(NODE(csnMaxX/2, csnMaxY, 0))
+/wait,1
+
+! select rhs
+/prep7
+nsel,s,loc,y,csnMaxY,csnMaxY
+nplot
+
+! compression
+f,all,fy,-load
+
+! select all
+nsel,all
+eplot
+/wait,1
+
+/solu
+solve
+
+/post1
+set,last
+plns,u,y
+
+dxC = -UY(NODE(csnMaxX/2, csnMaxY, 0))
+
+*msg,ui,dxC/dxT
+n (dxC/dxT): %g

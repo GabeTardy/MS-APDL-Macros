@@ -1,0 +1,518 @@
+! This is the working version. 
+rs
+
+! Duct properties (shell)
+w = 48 ! width - x
+h = 16 ! height - y
+r = 0.1 ! radius of fillet
+d = 96 ! depth - z 
+gauge = 26 ! steel sheet gauge
+t = 0.0187 ! steel sheet thickness
+
+! Fixed or free?
+fixedFree = 0 ! 0 - free, 1 - fixed
+
+! Copies?
+copies = 7
+! Full version
+nGauges = 2
+*dim,gaugeIDs,array,2
+gaugeIDs(1) = 16,26 !,28,30 !
+*dim,gaugeMinThk,array,2
+gaugeMinThk(1) = 0.0575,0.0187 !,0.0157,0.0127
+
+nMOI = 1 !2
+*dim,bIyys,array,1 !2
+bIyys(1) = 0.167 !,0.167/2
+
+nPressures = 1
+*dim,pressures,array,1
+pressures(1) = 10
+
+iterate = 1 ! 0 - no (use first values), 1 - yes
+
+*get,timeOrig,active,,time,wall
+
+! ! Test version
+! nGauges = 1
+! *dim,gaugeIDs,array,1
+! gaugeIDs(1) = 26
+! *dim,gaugeMinThk,array,1
+! gaugeMinThk(1) = 0.0187
+
+! nMOI = 1
+! *dim,bIyys,array,1
+! bIyys(1) = 0.167 !/2
+
+! nPressures = 1
+! *dim,pressures,array,1
+! pressures(1) = 10
+
+! 0.5 - 1.7157
+elementScale = 0.9375 !0.875 !0.75 !0.5 !1.5
+
+! Beam properties (flange)
+bIyy = 0.167 !/2
+bk = 2 ! h = k*b
+! Calculate b, h from Iyy, k:
+bb = (12*bIyy*bk**(-3))**(1/4)
+bh = bk*bb
+
+pressure = 10*62.4/(12**3)
+
+/prep7
+/PNUM,AREA,1
+/gline,1,-1
+/uis,msgpop,3
+
+mp,ex,1,29000000 ! psi
+mp,prxy,1,0.32 ! (in/in)/(in/in)
+!mp,dens,1,0.284 ! lb/in^3
+
+! working plane for section cuts
+! wpave,0,0,d/2
+! /cplane,1
+! /type,,sect
+! pldisp,1
+
+
+*if,r,eq,0,then
+   ! create "picture frame"
+   k,1,-w/2,h/2
+   k,2,w/2,h/2
+   k,3,w/2,-h/2
+   k,4,-w/2,-h/2
+
+   k,5,-w/2 + t,h/2 - t
+   k,6,w/2 - t,h/2 - t
+   k,7,w/2 - t,-h/2 + t
+   k,8,-w/2 + t,-h/2 + t
+
+   a,1,2,6,5 ! 1
+   a,2,3,7,6 ! 2
+   a,3,4,8,7 ! 3
+   a,4,1,5,8 ! 4
+   aadd,all
+*else
+   ! create guide points for curves
+   k,00009,-(w/2-r),h/2-r
+   k,00010,w/2-r,h/2-r
+   k,00011,w/2-r,-(h/2-r)
+   k,00012,-(w/2-r),-(h/2-r)
+   
+   ! create interior "picture frame" again for the beams
+   k,10001,-(w/2-r),h/2-t/2
+   k,10002,w/2-r,h/2-t/2
+   k,10003,w/2-t/2,h/2-r
+   k,10004,w/2-t/2,-(h/2-r)
+   k,10005,w/2-r,-(h/2-t/2)
+   k,10006,-(w/2-r),-(h/2-t/2)
+   k,10007,-(w/2-t/2),-(h/2-r)
+   k,10008,-(w/2-t/2),h/2-r
+   
+   ! create straight lines in SPECIFIC ORDER going clockwise around shape
+   l,10001,10002 ! end - 7
+   larc,10002,10003,00010,r-t/2 ! end - 3
+   l,10003,10004 ! end - 6
+   larc,10004,10005,00011,r-t/2 ! end - 2
+   l,10005,10006 ! end - 5
+   larc,10006,10007,00012,r-t/2 ! end - 1
+   l,10007,10008 ! end - 4
+   larc,10008,10001,00009,r-t/2 ! end - 0
+   
+   ! again get last defined for reference
+   *get,lmaxO,line,0,num,maxd
+   
+   ! create interior "picture frame" again for the beams
+   k,30001,-(w/2-r),h/2-t/2,d
+   k,30002,w/2-r,h/2-t/2,d
+   k,30003,w/2-t/2,h/2-r,d
+   k,30004,w/2-t/2,-(h/2-r),d
+   k,30005,w/2-r,-(h/2-t/2),d
+   k,30006,-(w/2-r),-(h/2-t/2),d
+   k,30007,-(w/2-t/2),-(h/2-r),d
+   k,30008,-(w/2-t/2),h/2-r,d
+   
+   ! create guide points for curves
+   k,30009,-(w/2-r),h/2-r,d
+   k,30010,w/2-r,h/2-r,d
+   k,30011,w/2-r,-(h/2-r),d
+   k,30012,-(w/2-r),-(h/2-r),d
+   
+   ! create straight lines in SPECIFIC ORDER going clockwise around shape
+   l,30001,30002 ! end - 7
+   larc,30002,30003,30010,r-t/2 ! end - 3
+   l,30003,30004 ! end - 6
+   larc,30004,30005,30011,r-t/2 ! end - 2
+   l,30005,30006 ! end - 5
+   larc,30006,30007,30012,r-t/2 ! end - 1
+   l,30007,30008 ! end - 4
+   larc,30008,30001,30009,r-t/2 ! end - 0
+
+   ! again get last defined for second edge
+   *get,lmaxF,line,0,num,maxd
+   
+   ! create depth guides
+   l,10001,30001
+   l,10002,30002
+   l,10003,30003
+   l,10004,30004
+   l,10005,30005
+   l,10006,30006
+   l,10007,30007
+   l,10008,30008
+   
+   ! again get last defined for guides
+   *get,lmaxG,line,0,num,maxd
+   
+   view,iso
+   
+   ! Most complicated section: by the right-hand rule, orient all areas so that they face outward
+   *do,i,0,6
+   al,lmaxF-i-1,lmaxG-i,lmaxO-i-1,lmaxG-i-1
+   *enddo
+   !al,lmaxF-7,lmaxG-6,lmaxO-7,lmaxG-7
+   !al,lmaxF-6,lmaxG-5,lmaxO-6,lmaxG-6
+   !al,lmaxF-5,lmaxG-4,lmaxO-5,lmaxG-5
+   ! (etc...)
+   ! Last one loops around:
+   al,lmaxF,lmaxG-7,lmaxO,lmaxG
+   
+   ! side boundary conditions
+   kl,9,0.5,40001
+   kl,1,0.5,40002
+   kl,13,0.5,40003
+   kl,5,0.5,40004
+   
+   l,40001,40002
+   l,40003,40004
+   
+   ! place boundary conditions at top
+   *get,lmaxBC,line,0,num,maxd
+   lsel,s,line,,lmaxBC-1,lmaxBC
+   !dl,all,all,ux
+   !dl,all,all,rotz
+   
+   ! place boundary conditions at sides
+   !lsel,s,line,,lmaxG-5
+   lsel,s,line,,lmaxG-4
+   !lsel,a,line,,lmaxG
+   lsel,a,line,,lmaxG-1
+   lplot
+   
+   !dl,all,all,uy
+   !dl,all,all,rotz
+   lsel,all
+   
+   ! intersect this line with the area to preserve boundary conditions
+   asbl,7,lmaxBC-1,,delete,delete ! note: the area number is hardcoded here, but shouldn't be. just trying to get this working.
+   asbl,3,lmaxBC,,delete,delete ! note: the area number is hardcoded here, but shouldn't be. just trying to get this working.
+   
+   ! Set element types
+   et,1,281 ! shell with in-plane stresses
+   sectype,1,shell
+   secdata,t,1,0.0,3
+   secoffset,mid
+   aesize,all,((h+w)/2)/15/elementScale
+   amesh,all
+   
+   ! Apply surface loading before the creation of beam side elements
+   sfe,all,1,pres,,pressure
+   
+   ! create beam elements
+   et,2,189
+   ! only select last eight lines (rhs) and the original eight lines (lhs)
+   ! also by some dumb luck the original eight lines don't get reassigned when we compress all line numbers
+   !lsel,s,line,,lmaxF-7,lmaxF
+   !lsel,a,line,,lmaxO-7,lmaxO
+   lsel,s,loc,z,0
+   lsel,a,loc,z,d
+   
+   sectype,2,beam,rect
+   latt,,,2,,,,2
+   secdata,bh,bb ! temporarily size beam
+   lesize,all,t/elementScale
+   lmesh,all
+   lsel,all
+   /eshape,1
+   eplot
+   
+   esel,s,type,,2
+   nsle,s,all
+   !d,all,rotx
+   !d,all,roty
+   *if,fixedFree,eq,1,then
+      !d,all,all
+   *endif
+   esel,all
+   nsel,all
+   
+   dtran
+   
+   egen,copies,10000,all,,,,,,,,0,0,d
+   !time,1
+   !lswrite,1
+   
+   nsel,s,loc,z,d*copies-0.01,d*copies+0.01
+   ! end boundary conditions
+   d,all,all
+   
+   nsel,s,loc,z,-0.01,0.01
+   ! start boundary conditions
+   d,all,all
+   
+   nsel,s,loc,y,-0.01,0.01
+   d,all,uy,0
+   d,all,rotz,0
+   
+   nsel,s,loc,x,-0.01,0.01
+   d,all,ux,0
+   d,all,rotz,0
+   
+   nsel,all
+   
+   nummrg,node
+   nummrg,elem
+*endif
+
+! d,NODE(0,h/2,0),ux,0
+! d,NODE(0,h/2,d),ux,0
+! d,NODE(-w/2,0,0),uy,0
+! d,NODE(w/2,0,0),uy,0
+! d,NODE(-w/2,0,d),uy,0
+! d,NODE(w/2,0,d),uy,0
+d,NODE(-w/2,0,0),uz,0
+d,NODE(w/2,0,0),uz,0
+
+! d,NODE(0,h/2,0),rotx,0
+! d,NODE(0,-h/2,0),rotx,0
+! d,NODE(0,h/2,d),rotx,0
+! d,NODE(0,-h/2,d),rotx,0
+
+eplot
+/dscale,all,3
+/PBC,ALL,,1 
+/PBC,NFOR,,0
+/PBC,NMOM,,0
+/PBC,RFOR,,0
+/PBC,RMOM,,0
+/PBC,PATH,,0
+eplot
+
+! Begin csv file
+*cfopen,'hoop_mpdata',csv
+*vwrite,'Gauge No.','Gauge Min. Thk.','MOI','Pressure','Segment No.','Mdpt. Defl.'
+%C,%C,%C,%C,%C,%C,%C
+
+! Iterate over desired properties
+*do,i,1,nGauges
+   
+   /prep7
+   ! Set iterative gauge thickness
+   gauge = gaugeIDs(i)
+   t = gaugeMinThk(i)
+   sectype,1,shell
+   secdata,t,1,0.0,3
+   secoffset,mid
+   
+*do,ii,1,nMOI
+
+   /prep7
+   ! Set iterative beam moment of inertia
+   bIyy = bIyys(ii)
+   bk = 3 ! h = k*b
+   ! Calculate b, h from Iyy, k:
+   bb = (12*bIyy*bk**(-3))**(1/4)
+   bh = bk*bb
+   sectype,2,beam,rect
+   secdata,bh,bb
+   
+*do,iii,1,nPressures
+
+   wg = pressures(iii)
+   pressure = wg*62.4/(12**3)
+   
+   /prep7
+   ! Set pressure
+   esel,s,type,,1 ! select only shell
+   sfe,all,1,pres,,pressure
+   esel,all
+
+! Continue
+/solu
+/uis,msgpop,2
+*get,timeFinal,active,,time,wall
+dTime = 60*(timeFinal - timeOrig) ! in minutes
+*msg,ui,gauge,t,bIyy,wg,dTime
+Now solving: %g Gauge (Thickness: %g in) %/ Moment of Inertia: %g in4 %/ Water Gauge: %g in %/ Elapsed Time: %g min
+
+antype,static
+nlgeom,on
+
+!nsubst,250,2500,250
+nsubst,500,5000,500
+!outres,all,all
+! autots,on
+!arclen,on,1,1/10000
+!arclen,on
+solve
+!*end
+
+*get,timeFinal,active,,time,wall
+dTime = 60*(timeFinal - timeOrig) ! in minutes
+*msg,ui,gauge,t,bIyy,wg,dTime
+Now postprocessing: %g Gauge (Thickness: %g in) %/ Moment of Inertia: %g in4 %/ Water Gauge: %g in %/ Elapsed Time: %g min
+
+endL = UY(NODE(-(w/2-r),h/2-t/2,0))
+endC = UY(NODE(0,h/2-t/2,0))
+dEndU = endC - endL
+mp = UY(NODE(0,h/2-t/2,d/2)) ! (w/2-r),
+mpSide = UY(NODE(-(w/2-r),h/2-t/2,d/2)) 
+
+/post1
+/dscale,all,3
+view,iso
+!/gline,1,-1
+!plesol,s,x
+/gline,1,0
+set,last
+pldisp,0
+
+! - save img
+fname = strcat('hoop_gauge-',chrval(gauge))
+fname = strcat(fname,'_I-')
+fname = strcat(fname,chrval(bIyy))
+fname = strcat(fname,'_wg-')
+fname = strcat(fname,chrval(wg))
+/image,save,fname,'png'
+
+/post1
+/dscale,all,3
+view,iso
+plnsol,s,eqv,0,1
+
+fname = strcat('hoop_gauge-',chrval(gauge))
+fname = strcat(fname,'_I-')
+fname = strcat(fname,chrval(bIyy))
+fname = strcat(fname,'_wg-')
+fname = strcat(fname,chrval(wg))
+fname = strcat(fname,'_vmis')
+/image,save,fname,'png'
+
+! number of curve inner steps
+nis = 25
+zPos = d/2
+rt = (r - t/2)
+
+! total number of curve points: 8 (two for each side) + number of curve steps*4 curves
+path,cent,8+nis*4,8,100 ! (7 - x, y, z, s[unused], sx, sy, uy; 100 - 100 divisions)
+
+! define path for whole object
+! top
+ppath,1,,-(w/2-r),h/2-t/2,zPos
+ppath,2,,(w/2-r),h/2-t/2,zPos
+
+! top right curve
+*do,qqqqq,1,nis
+ang = qqqqq/(nis+1)*pi/2
+ppath,2+qqqqq,,w/2-r + rt*sin(ang),h/2-r + rt*cos(ang),zPos
+*enddo
+
+! right
+ppath,2+nis+1,,w/2-t/2,h/2-r,zPos
+ppath,2+nis+2,,w/2-t/2,-(h/2-r),zPos
+
+! bottom right curve
+*do,qqqqq,1,nis
+ang = qqqqq/(nis+1)*pi/2
+ppath,2+nis*1+2+qqqqq,,w/2-r + rt*cos(ang),-(h/2-r) - rt*sin(ang),zPos
+*enddo
+
+! bottom
+ppath,2+nis*2+2+1,,(w/2-r),-(h/2-t/2),zPos
+ppath,2+nis*2+2+2,,-(w/2-r),-(h/2-t/2),zPos
+
+! bottom left curve
+*do,qqqqq,1,nis
+ang = qqqqq/(nis+1)*pi/2
+ppath,2+nis*2+2+2+qqqqq,,-(w/2-r) - rt*sin(ang),-(h/2-r) - rt*cos(ang),zPos
+*enddo
+
+! left
+ppath,2+nis*3+2+2+1,,-(w/2-t/2),-(h/2-r),zPos
+ppath,2+nis*3+2+2+2,,-(w/2-t/2), (h/2-r),zPos
+
+! top left curve
+*do,qqqqq,1,nis
+ang = qqqqq/(nis+1)*pi/2
+ppath,2+nis*3+2+2+2+qqqqq,,-(w/2-r) - rt*cos(ang),(h/2-r) + rt*sin(ang),zPos
+*enddo
+
+pdef,sx,s,x,noav
+pdef,sy,s,y,noav
+pdef,uy,u,y,noav
+pdef,us,u,sum,noav
+
+eplot
+view,side
+
+plpagm,sx,50
+
+fname = strcat('hoopnc-g-',chrval(gauge))
+fname = strcat(fname,'_I-')
+fname = strcat(fname,chrval(bIyy))
+fname = strcat(fname,'_wg-')
+fname = strcat(fname,chrval(wg))
+fname = strcat(fname,'_cdist')
+/image,save,fname,'png'
+
+save,fname,'db'
+
+! path,centTotal,7,7,100 ! (7 - x, y, z, s[unused], sx, sy, uy; 100 - 100 divisions)
+! ppath,1,,-(w/2-r),h/2-t/2,d/2
+! ppath,2,,(w/2-r),h/2-t/2,d/2
+! ppath,3,,w/2,0,d/2
+! ppath,4,,(w/2-r),-(h/2-t/2),d/2
+! ppath,5,,-(w/2-r),-(h/2-t/2),d/2
+! ppath,6,,-w/2,0,d/2
+! ppath,7,,-(w/2-r),h/2-t/2,d/2
+
+! pdef,sx,s,x,noav
+! pdef,sy,s,y,noav
+! pdef,us,u,sum,noav
+
+! plpagm,us,50
+
+! fname = strcat(fname,'_centTotalDist')
+! fname = strcat(fname,chrval(pressure))
+! /image,save,fname,'png'
+
+*cfopen,'hoop_mpdata',csv,,append
+*do,iiii,1,copies
+mp = UY(NODE(0,h/2-t/2,d*(iiii-1) + d/2))
+*vwrite,gauge,t,bIyy,pressure,iiii,mp
+%g,%g,%g,%g,%g,%g
+*enddo
+*cfclos
+
+finish
+
+*if,iterate,eq,0,then
+   *exit
+*endif
+
+*enddo
+
+*if,iterate,eq,0,then
+   *exit
+*endif
+
+*enddo
+
+*if,iterate,eq,0,then
+   *exit
+*endif
+
+*enddo
+
+*cfclos

@@ -1,0 +1,19 @@
+! view.mac
+! shorthand script by Gabriel Tardy
+orientation = ARG1
+
+side = 420
+iso = 421
+snap = 422
+
+*if,orientation,eq,side,then
+/view,1,,,1
+/ang,1
+*elseif,orientation,eq,iso,then
+/view,1,1,2,3
+/ang,1
+*elseif,orientation,eq,snap,then
+! empty for now
+*endif
+
+/rep 

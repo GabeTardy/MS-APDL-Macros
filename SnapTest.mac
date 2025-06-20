@@ -1,0 +1,270 @@
+! Configurable Sinusoidal Snapthrough - Beam Elements
+! Written by Gabriel Tardy
+! Arguments:
+! ARG1:
+!	- 0: Static (default)
+!	- 1: Modal+transient
+! ARG2:
+!	- 0: Load+Pull (single-cycle) (default)
+!	- 1: Load+Load (double-cycle)
+! ARG3:
+!	- 0: Do not show animation (default)
+!	- 1: Show animation
+
+!!- Setup
+rs ! clearing macro
+/rep ! replot screen
+/pbc,all,,1 ! setup view options
+/psf,pres,norm,2,1,on ! Show pressures on model (normal)
+/psf,pres,tanx,2,1,on ! Show pressures on model (tanx)
+/psf,pres,tany,2,1,on ! Show pressures on model (tany)
+/eshape,1 ! show true cross-sections
+/number,0 ! Make colors represent materials and show the material number
+/pnum,mat,1
+/efacet,4 ! show more accurate shell plots with mid-nodes (technical: require apdl to plot 4 facets/edge)
+view,side ! Show isometric view
+/prep7
+!-!
+
+!!- Inputs
+m = 1/3
+n = 6
+lambda = 1/50 
+a0 = 1
+zeta = 1/5
+tau = 150
+
+k = 2000*7/tau ! iteration resolution constant. higher = better resolution, longer time taken to simulate
+fps = 60
+
+!! Method 1: Keep Et constant
+! nRatio = 0.25
+! Et = 100e6
+! Ec = nRatio*Et
+
+!! Method 2: Keep Er constant (see accompanying Maple file)
+nRatio = 1
+nStar = (nRatio**(3/2) + sqrt(nRatio) + 2*nRatio)/(4*nRatio**(3/2))
+Et = nStar*100e6
+Ec = nRatio*Et
+
+!! 71HERO
+! Ec = 45e6
+! Et = 100e6
+! Ec = Et
+
+nut = 0
+nuc = 0 !Ec/Et*nut
+
+Eq = (sqrt(Et) + sqrt(Ec))*(sqrt(Et) + sqrt(Ec))
+Er = 4*Et*Ec/Eq
+
+rho = 0.0075 ! Rohacell 71Hero https://products.evonik.com/assets/35/22/ROHACELL_HERO_2022_April_EN_243522.pdf
+
+pi = 3.1415926535
+
+! Dimensioning
+l = a0/lambda
+ndiv = l
+h = a0*(3*m)**(0.5)
+b = h*2
+Izz = b*(h**3)/12
+Ar = b*h
+q0 = n*Er*Izz*a0*(pi/l)**4
+Dxt = Er*Izz
+!-!
+
+!!- Element Model
+et,1,189 ! SHELL281
+sectype,1,beam,rect
+secdata,h,b
+!-!
+
+!!- Material Model
+! mp,ex,1,Ex
+! mp,prxy,1,prxy
+mp,dens,1,rho
+tb,user,1,1,4
+tbtemp,0
+tbdata,1,Et,Ec,nut,nuc
+mp,dens,1,rho
+!-!
+
+!!- Physical Model
+seltol,0.001 ! setup selection tolerance (used later for constraints)
+
+sinarc,l,ndiv,a0 ! setup sine arc, l long, with ndiv divisions, and a0 high.
+
+! show progress
+lplot
+/replot
+/wait,0.5
+!-!
+
+!!- Meshing
+lesize,all,,,1
+lmesh,all
+eplot
+/replot
+/wait,0.5
+!-!
+
+!!- Apply Pin-Pin Boundary Conditions
+d,NODE(0,0,0),ux,0,,,,uy,uz,rotx,roty
+d,NODE(l,0,0),ux,0,,,,uy,uz,rotx,roty
+!-!
+
+!!- Perform Analyses
+*if,ARG1,eq,1,then ! (modal+)transient analysis
+	! /solu
+	! antype,modal
+	! mxpand,0,,,0
+	! lumpm,0
+	! pstres,0
+	! modopt,lanb,5,0,0,,off
+	! solve
+
+	! *get,firstModeFreq,mode,1,freq
+	firstModeFreq = 15.3342084 ! PURE GUESS BASED ON ISOTROPIC CASE
+
+	dt = 1/(k*firstModeFreq)
+
+	omega_ = firstModeFreq*2*pi ! (pi/l)*(pi/l)*sqrt(Er*Izz/1/b/h)
+	massDamping_ = zeta*omega_
+	t0_ = tau/omega_
+
+	! Step 7: solve, dynamic (get dynamic response)
+	eplot 
+	/replot
+
+	*msg,ui,omega_,massDamping_,t0_,dt
+	Omega: %g, Alpha: %g, t0: %g, dt: %g
+
+	*msg,ui,3*t0_
+	Total Expected TIME: %g
+
+	finish
+	/solu
+	antype,transient
+	nlgeom,1
+	deltim,dt
+	alphad,massDamping_
+	betad,0
+	kbc,0
+	lumpm,0
+	outres,all,all
+	ncnv,0
+	! nsubst,500
+
+	*if,ARG2,eq,0,then
+		! Place Load Steps
+		sinloadbeam,q0,l,1
+		time,1*t0_
+		lswrite,1
+		/wait,0.5
+
+		sinloadbeam,-q0/2,l,1
+		time,5/2*t0_
+		lswrite,2
+
+		sinloadbeam,0,l,1
+		time,3*t0_
+		lswrite,3
+
+		! Solve
+		lssolve,1,3,1
+	*else
+		! Place Load Steps
+		sinloadbeam,q0,l,1
+		time,1*t0_
+		lswrite,1
+		/wait,0.5
+
+		sinloadbeam,0,l,1
+		time,2*t0_
+		lswrite,2
+
+		sinloadbeam,q0,l,1
+		time,3*t0_
+		lswrite,3
+
+		sinloadbeam,0,l,1
+		time,4*t0_
+		lswrite,4
+
+		! Solve
+		lssolve,1,4,1
+	*endif
+*else
+	! Place Load
+	sinloadbeam,q0,l,1
+	/wait,0.5
+	
+	/solu
+	antype,static
+	nlgeom,on
+	nsubst,250
+	time,1
+	arclen,on,1
+	autots,off
+	outres,all,all
+	solve
+*endif
+!-!
+
+!!- Plot Results
+/post1
+set,first
+view,side
+
+! to show contour plot of displacement
+/dscale,all,auto
+plnsol,u,y,0,1
+/wait,5
+!-!
+
+!!- Plot Displacement Graph
+/post26
+nsol,2,NODE(l/2,a0,b/2),u,y,UY ! load the nodal displacement solution at the center of the arch to time-hist variable 2
+plvar,2
+/wait,5
+!-!
+
+!!- Export Results to Nondimensionalizer
+vget,time,1 
+vget,dispy,2
+
+*if,ARG1,eq,1,then
+	*cfopen,'geom2DT','csv'
+	*vwrite,'a0','E','I','L','n','p','A','t0'
+%C,%C,%C,%C,%C,%C,%C,%C
+	*vwrite,a0,Er,Izz,l,n,omega_,b*h,t0_
+%G,%G,%G,%G,%G,%G,%G,%G
+	*cfclos
+
+	*cfopen,'results2DT','csv'
+	*vwrite,'t','uz'
+%C,%C
+*else
+	*cfopen,'geom2D','csv'
+	*vwrite,'a0','E','I','L','q0','m','n'
+%C,%C,%C,%C,%C,%C,%C
+	*vwrite,a0,Er,Izz,l,q0,m,n
+%G,%G,%G,%G,%G,%G,%G
+	*cfclos
+
+	*cfopen,'results2D','csv'
+	*vwrite,'P','uz'
+%C,%C
+*endif
+
+*vwrite,time(1),dispy(1) 
+%G,%G 
+*cfclos
+!-!
+
+*if,ARG3,eq,1,then
+snapanim,ARG2
+*endif
+
+*status,PRM_

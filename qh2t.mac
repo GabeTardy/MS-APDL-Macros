@@ -1,0 +1,5 @@
+!hoop2 test script
+*get,timeFinal,active,,time,wall
+dTime = 60*(timeFinal - timeOrig) ! in minutes
+*msg,ui,gauge,t,bIyy,wg,dTime
+Now processing: %g Gauge (Thickness: %g in) %/ Moment of Inertia: %g in4 %/ Water Gauge: %g in %/ Elapsed Time: %g min

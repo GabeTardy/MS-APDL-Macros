@@ -1,0 +1,70 @@
+rs
+! confirm behavior of pressure command
+! plate v2
+
+! create 96x(24+4*Pi) area
+pi = 3.1416
+/prep7
+k,,-24-4*pi,-48
+k,,-24-4*pi, 48
+k,, 24+4*pi, 48
+k,, 24+4*pi,-48
+
+l,1,2
+l,2,3
+l,3,4
+l,4,1
+
+al,1,2,3,4
+
+et,1,281
+sectype,1,shell
+secdata,0.0187,1,0.0,3
+secoffset,mid
+aesize,all,2
+amesh,all
+
+lsel,s,line,,2
+lsel,a,line,,4
+dl,all,all,rotx
+
+et,2,189
+sectype,2,beam,rect
+latt,,,2,,,,2
+secdata,0.594900637,1.18980127
+lesize,all,2
+lmesh,all
+/eshape,1
+eplot
+
+lsel,all
+lsel,s,line,,1
+lsel,a,line,,3
+
+! constrain edges
+/solu
+dl,all,all,ux
+dl,all,all,uy
+dl,all,all,uz
+dl,all,all,rotx
+dl,all,all,rotz
+lsel,all
+
+! apply pressure
+esel,all
+sfe,all,1,pres,,10*62.4/(12**3)
+
+! material
+mp,ex,1,29000e3
+mp,prxy,1,0.32
+
+dtran
+antype,static
+nlgeom,on
+nsubst,500,5000,500
+arclen,on,5,1/10000
+solve
+
+/dscale,all,10
+/post1
+pldisp,0

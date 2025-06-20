@@ -1,0 +1,128 @@
+! Finite Element Analysis of Bi-Modulus Ceramic Structure
+*if,ARG1,eq,0,then
+! Volume Version
+rs
+/prep7
+et,1,185 
+
+bimodCompType = 0
+! 0 - usermat.F
+! 1 - cast iron
+! 2 - isotropic (uses Et)
+
+Et = 10000e3
+Ec = 2*Et
+nut = 0.3
+nuc = 0.3
+
+setbimod,bimodCompType
+mp,dens,1,0.079
+
+l = 80
+w = 4
+h = 20
+k,,0,0,-w/2
+k,,l,0,-w/2
+k,,l,h,-w/2
+k,,0,h,-w/2
+k,,0,0,w/2
+k,,l,0,w/2
+k,,l,h,w/2
+k,,0,h,w/2
+v,1,2,3,4,5,6,7,8
+
+elsize,2
+vmesh,all
+
+view,iso
+eplot
+
+nsel,s,loc,x,0
+d,all,all
+nsel,all
+d,NODE(l,h/2,0),uy,-1 ! apply unit displacement
+
+time,1
+lswrite,1
+
+/solu
+antype,static
+nlgeom,on
+nsubst,50
+outres,all,all
+outres,svar,all
+autots,off
+!deltim,0.01
+!ncnv,0,0,0,300
+!lssolve,1,1,1
+solve
+
+/post1
+set,last
+*if,bimodCompType,eq,0,then
+	etable,method,svar,1
+	etable,torc,svar,2
+	etable,sI,svar,3
+	etable,E,svar,4
+	etable,nu,svar,5
+   etable,sedEl,svar,6
+	pletab,sI,avg
+	!plesol,s,eqv
+*else
+	etable,s1,s,x
+	etable,s2,s,y
+	sadd,sI,s1,s2
+	pletab,sI,avg
+	!plesol,s,eqv
+*endif
+
+! create plots
+path,yaxis,2,12,100 ! (12 - x, y, z, s[unused], see below; 100 - 100 divisions)
+ppath,1,,0,0,0
+ppath,2,,0,h,0
+
+! 1a. Principal 1
+pdef,s1,s,1 !,noav
+
+! 1b. Principal 3
+pdef,s3,s,3 !,noav
+
+! 2. sigma(x)
+pdef,sx,s,x !,noav
+
+! 1. Von Mises
+pdef,seqv,s,eqv !,noav
+
+! 3. tau(xy)
+pdef,txy,s,xy !,noav
+
+! 3. tau(xz)
+pdef,txz,s,xz !,noav
+*endif
+
+*if,ARG1,eq,8,then
+   ! Figure 8
+   plpath,s1,s3
+*endif
+
+*if,ARG1,eq,9,then
+   ! Figure 8
+   plpath,sx
+*endif
+
+*if,ARG1,eq,10,then
+   ! Figure 8
+   plpath,seqv
+*endif
+
+*if,ARG1,eq,11,then
+   ! Figure 8
+   plpath,txy
+*endif
+
+*if,ARG1,eq,12,then
+   ! Figure 8
+   plpath,txz
+*endif
+
+!plpagm,sy,25

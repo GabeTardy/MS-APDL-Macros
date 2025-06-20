@@ -1,0 +1,169 @@
+rs
+
+w = 40 ! width - x
+h = 10 ! length - x
+r = 4.9 ! radius of fillet
+t = 0.1 ! thickness of hoop
+
+pressure = 0.1
+
+/prep7
+/PNUM,AREA,1
+
+*if,r,eq,0,then
+! create "picture frame"
+k,1,-w/2,h/2
+k,2,w/2,h/2
+k,3,w/2,-h/2
+k,4,-w/2,-h/2
+
+k,5,-w/2 + t,h/2 - t
+k,6,w/2 - t,h/2 - t
+k,7,w/2 - t,-h/2 + t
+k,8,-w/2 + t,-h/2 + t
+
+a,1,2,6,5 ! 1
+a,2,3,7,6 ! 2
+a,3,4,8,7 ! 3
+a,4,1,5,8 ! 4
+aadd,all
+*else
+! create "picture frame"
+k,1,-w/2,h/2
+k,2,w/2,h/2
+k,3,w/2,-h/2
+k,4,-w/2,-h/2
+
+k,5,-w/2 + t,h/2 - t
+k,6,w/2 - t,h/2 - t
+k,7,w/2 - t,-h/2 + t
+k,8,-w/2 + t,-h/2 + t
+
+a,1,2,6,5 ! 1
+a,2,3,7,6 ! 2
+a,3,4,8,7 ! 3
+a,4,1,5,8 ! 4
+
+! Create fillet general geometry
+blc4,-w/2,h/2,t+r,-t-r ! 5
+blc4,w/2,h/2,-t-r,-t-r ! 6
+blc4,w/2,-h/2,-t-r,t+r ! 7
+blc4,-w/2,-h/2,t+r,t+r ! 8
+
+blc4,-w/2 + t,h/2 - t,r,-r ! 9
+blc4,w/2 - t,h/2 - t,-r,-r ! 10
+blc4,w/2 - t,-h/2 + t,-r,r ! 11
+blc4,-w/2 + t,-h/2 + t,r,r ! 12
+
+cyl4,-w/2 + t + r,h/2 - t - r,t+r ! 13
+cyl4,w/2 - t - r,h/2 - t - r,t+r  ! 14
+cyl4,w/2 - t - r,-h/2 + t + r,t+r ! 15
+cyl4,-w/2 + t + r,-h/2 + t + r,t+r! 16
+
+cyl4,-w/2 + r + t,h/2 - r - t,r ! 17
+cyl4,w/2 - r - t,h/2 - r - t,r  ! 18
+cyl4,w/2 - r - t,-h/2 + r + t,r ! 19
+cyl4,-w/2 + r + t,-h/2 + r + t,r! 20
+
+! Boolean to create fillet inner edge addition
+asba,9 ,17,,keep,keep ! 21
+asba,10,18,,keep,keep ! 22
+asba,11,19,,keep,keep ! 23
+asba,12,20,,keep,keep ! 24
+
+! inner edge with outer face
+aglue,21,22,23,24,1,2,3,4 ! turns (1, 2, 3, 4, 21, 22, 23, 24)->(29, 30, 32, 31, 25, 26, 27, 28)
+
+! Boolean to create fillet outer edge subtraction
+asba,5,13,,keep,keep
+asba,6,14,,keep,keep
+asba,7,15,,keep,keep
+asba,8,16,,keep,keep
+/PNUM,AREA,1
+
+! Delete tool shapes
+adele,5,8,,1
+adele,9,12,,1
+adele,13,24,,1
+
+! Clear outer fillet
+asba,all,1
+asba,all,2
+asba,all,3
+asba,all,4
+
+! Merge everything
+aadd,all
+*endif
+
+! seltol,10e-8
+! lsel,s,loc,y,h/2 - t
+! lsel,a,loc,y,-h/2 + t
+! lsel,a,loc,x,w/2 - t
+! lsel,a,loc,x,-w/2 + t
+
+! *if,r,gt,0,then
+! lsel,a,radius,,r
+! lsel,u,length,,r
+! *endif
+
+! sfl,all,pres,pressure
+
+! lsel,all
+! esize,0.1
+	
+! ! mesh
+! et,1,183
+! amesh,all
+! sftran ! transfer area loads to element
+! time,1
+! lswrite,1
+
+! ! material
+! Et = 10000e3
+! Ec = 1*Et
+! nut = 0.3
+! nuc = 0.3
+
+! tb,user,1,1,4
+! tbtemp,0
+! tbdata,1,Et,Ec,nut,nuc
+! tb,state,1,,5
+
+! /PSF,PRES,NORM,2,0,1
+! eplot
+! /wait,1
+
+! /solu
+! antype,transient
+! mp,dens,1,0.079
+! nlgeom,on
+! nsubst,50
+! outres,all,all
+! outres,svar,all
+! autots,off
+! deltim,0.01
+! ncnv,0,0,0,300
+! lssolve,1,1,1
+
+! /post1
+! plesol,s,x ! x - radial direction
+
+! set,last
+! etable,method,svar,1
+! etable,torc,svar,2
+! etable,sI,svar,3
+! etable,E,svar,4
+! etable,nu,svar,5
+! pletab,sI,avg
+
+! r = 5
+! uy = UY(NODE(-w/2 + r, h/2,0))
+
+! *msg,ui,uy
+! UY: %g
+
+
+! ! case (1) : 1.027530915E-002
+! ! case (2) : 2.132968741E-002
+! ! case (3) : 7.837300

@@ -1,0 +1,177 @@
+! difference between this and chp1 is that the supports are on the bottom!!!!!!!
+rs
+/PSF,PRES,NORM,2,0,1
+/PBC,ALL, ,1
+/PSYMB,DOT,1
+
+n = 1/3
+ExT = 30000e3
+ExC = n*ExT
+
+L = 1 ! total length is 2*L!!!!!
+h = 1
+h2 = h/(sqrt(n) + 1) ! compression zone height
+h1 = h*sqrt(n)/(sqrt(n) + 1)! tensile zone height
+
+elsize = 0.05! 05 !0.05
+epsilon = 10e-7
+
+*if,n,gt,1,then
+	ExA = ExC
+*else
+	ExA = ExT
+*endif
+
+! set up area
+/prep7
+k,,-L,-h1
+k,,L,-h1
+k,,L,0
+k,,-L,0
+k,,-L,h2
+k,,L,h2
+! k,,-1,0
+! k,,1,0
+! k,,1,1
+! k,,-1,1
+a,1,2,3,4
+a,3,4,5,6
+
+nut = 0
+nuc = 0 !Ec/Et*nut
+
+! set material = usermat
+! tb,user,1,1,4
+! tbtemp,0
+! tbdata,1,ExT,ExC,nut,nuc
+! tb,state,1,,5
+
+! set material = cast iron
+mp,ex,1,ExA
+mp,prxy,1,nut
+
+tb,cast,1,1,1,isotropic
+
+! set compression curve
+tb,uniaxial,1,1,2,comp
+tbtemp,0
+tbpt,,0,0
+tbpt,,epsilon,epsilon*ExA
+tbpt,,0.1,0.1*ExC
+tbpt,,1,ExC
+tbpt,,2,2*ExC
+tbpt,,3,3*ExC
+tbpt,,4,4*ExC
+
+! set tension curve
+tb,uniaxial,1,1,3,tens
+tbtemp,0
+tbpt,,0,0
+tbpt,,epsilon,epsilon*ExA
+tbpt,,0.1,0.1*ExT
+tbpt,,1,ExT
+tbpt,,2,2*ExT
+tbpt,,3,3*ExT
+tbpt,,4,4*ExT
+
+! make into shell
+et,1,183!281
+!sect,1,shell
+!secdata, 1,0.5,0.0,3
+
+! aesize,all,0.25
+! for whatever reason the element size is directly related to convergence of this model. 0.25 is the smallest size that works (confirm this?)
+aesize,all,elsize
+amesh,all
+
+! set displacement bc
+/solu
+! Pin-roller (SS)
+d,NODE(-L,-h1,0),ux,0,,,,uy,rotx
+d,NODE(L,-h1,0),uy,0,,,,rotx
+
+! Fixed-fixed (NOT SS)
+! d,NODE(-L,0,0),all
+! d,NODE(L,0,0),all
+!d,all,uz
+
+
+! set force bc on load key 5 (top)
+! esel,s,cent,y,0.5,1
+esel,s,cent,y,h2-elsize,h2
+!sfe,all,5,pres, ,1
+sfe,all,2,pres, ,1
+esel,all
+/pbc,all,,on
+eplot
+/wait,1
+! f,NODE(-1,0,0),mz,-1/2
+! f,NODE(1,0,0),mz,1/2
+
+/solu
+neqit, 50000
+nlgeom,on
+nsubst,100!0
+time,1
+arclen,on,1
+autots,off
+outres,all,all
+outres,svar,all !infuriating that "all" does not include this
+solve
+
+/post1
+/eshape,1
+!view,iso
+/dscale,all,1
+set,last
+!plnsol,s,x,0,1
+!plnsol,u,x,0,1
+!/wait,5
+
+plnsol,u,y,0,1
+
+set,last
+etable,method,svar,1
+etable,torc,svar,2
+etable,sI,svar,3
+etable,E,svar,4
+etable,nu,svar,5
+pletab,sI,avg
+pletab,torc,avg
+
+etable,sx,s,x
+etable,sy,s,y
+sadd,s1,sx,sy
+
+! get an empty table (all zeroes) 
+etable,znull,eppl,1
+
+! determine tensile zone (zero = tensile)
+smin,sxT,sx,znull
+
+
+! determine compressive zone (zero = compressive)
+smax,sxC,sx,znull
+
+pletab,sxC,avg
+
+! take midplane, top, and bottom sigma__xx and export them to a csv file
+*cfopen,'chp','csv'
+*vwrite,'x','sxx+(-h1)','sxx-(+h2)','sxx0(0)'
+%C,%C,%C,%C
+*do,ii,-L,L,elsize
+	! get bottom stress
+	*get,sxtii,node,NODE(ii,-h1,0),s,x
+	
+	! get top stress
+	*get,sxcii,node,NODE(ii,h2,0),s,x
+	
+	! get neutral axis stress
+	*get,sx0ii,node,NODE(ii,0,0),s,x
+
+	! write to file
+	*vwrite,ii,sxtii,sxcii,sx0ii
+%G,%G,%G,%G
+*enddo
+
+*cfclos

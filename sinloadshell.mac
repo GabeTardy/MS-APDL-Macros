@@ -1,0 +1,43 @@
+loadMagnitude = ARG1
+actualLength = ARG2
+
+pi=3.14159265359
+
+*get,numl,elem,,count
+i = 0
+*do,ct,1,numl
+
+	i=ELNEXT(i)
+	
+	! get start and end node numbers
+	n1 = NELEM(i,1)
+	n2 = NELEM(i,2)
+	n3 = NELEM(i,3)
+	n4 = NELEM(i,4)
+	
+	! get x- and z-position of each node
+	n1x = NX(n1)
+	n1z = NZ(n1)
+	
+	n2x = NX(n2)
+	n2z = NZ(n2)
+	
+	n3x = NX(n3)
+	n3z = NZ(n3)
+	
+	n4x = NX(n4)
+	n4z = NZ(n4)
+	
+	! angle
+	ang = atan((n2z-n1z)/(n2x-n1x))
+	
+	q1 = loadMagnitude*sin(pi*n1x/actualLength)
+	q2 = loadMagnitude*sin(pi*n2x/actualLength)
+	
+	! make a surface load on the line interpolating linearly between f of the two keypoints' x positions
+	sfe,i,1,pres,,q1*cos(ang),q2*cos(ang),q2*cos(ang),q1*cos(ang) ! load key 2 - lateral
+	sfe,i,6,pres,,-q1*sin(ang),-q2*sin(ang),-q2*sin(ang),-q1*sin(ang) ! load key 6 - axial?
+	
+	! 1: -z direction
+	! 3: +x direction
+*enddo

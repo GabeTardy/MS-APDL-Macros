@@ -1,0 +1,13 @@
+! 1DTorsion.mac
+
+rs
+/prep7
+k
+k,,10,0
+l,1,2
+
+et,1,189
+setbimod,0
+sectype,1,beam,cyl
+
+lmesh,,all

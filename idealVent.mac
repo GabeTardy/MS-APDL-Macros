@@ -1,0 +1,54 @@
+rs
+/prep7
+
+w = 64 ! width - x
+h = 16 ! height - y
+d = 96 
+
+k,1
+k,2,h/2,h/2
+k,3,w/2,h/2
+k,4,h/2,0
+
+larc,1,2,4,8
+l,2,3
+
+et,1,189
+sectype,1,beam,rect
+
+bIyy = 0.167/2
+bk = 2 ! h = k*b
+! Calculate b, h from Iyy, k:
+bb = (12*bIyy*bk**(-3))**(1/4)
+bh = bk*bb
+
+secdata,bh,bb
+secdata,0.0187,1
+
+mp,ex,1,29000000 ! psi
+mp,prxy,1,0.32 ! (in/in)/(in/in)
+mp,dens,1,0.284 ! lb/in^3
+
+lesize,all,0.0575
+lmesh,all,all
+/eshape,1
+eplot
+
+d,NODE(0,0,0),uy,0
+d,NODE(0,0,0),rotz,0
+
+d,NODE(w/2,h/2,0),ux,0
+d,NODE(w/2,h/2,0),rotz,0
+
+d,NODE(0,0,0),rotx,0
+d,NODE(0,0,0),roty,0
+d,NODE(0,0,0),uz,0
+
+sfbeam,all,2,pres,-10*62.4/(12**3) !*d/2
+
+/solu
+antype,static
+nlgeom,on
+
+nsubst,2500,25000,2500
+solve

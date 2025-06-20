@@ -1,0 +1,229 @@
+! This is the working version. 
+rs
+
+! Duct properties (shell)
+w = 64 ! width - x
+h = 16 ! height - y
+r = 7.9 ! radius of fillet
+t = 0.0466 !0.0187 !0.0189 ! thickness of hoop
+d = 96 ! depth - z 
+
+! Beam properties (flange)
+bIyy = 0.167/2
+bk = 3 ! h = k*b
+! Calculate b, h from Iyy, k:
+bb = (12*bIyy*bk**(-3))**(1/4)
+bh = bk*bb
+
+pressure = 10*62.4/(12**3)
+
+/prep7
+/PNUM,AREA,1
+/gline,1,-1
+
+mp,ex,1,29000000 ! psi
+mp,prxy,1,0.32 ! (in/in)/(in/in)
+mp,dens,1,0.284 ! lb/in^3
+
+*if,r,eq,0,then
+   ! create "picture frame"
+   k,1,-w/2,h/2
+   k,2,w/2,h/2
+   k,3,w/2,-h/2
+   k,4,-w/2,-h/2
+
+   k,5,-w/2 + t,h/2 - t
+   k,6,w/2 - t,h/2 - t
+   k,7,w/2 - t,-h/2 + t
+   k,8,-w/2 + t,-h/2 + t
+
+   a,1,2,6,5 ! 1
+   a,2,3,7,6 ! 2
+   a,3,4,8,7 ! 3
+   a,4,1,5,8 ! 4
+   aadd,all
+*else
+   ! create guide points for curves
+   k,00009,-(w/2-r),h/2-r
+   k,00010,w/2-r,h/2-r
+   k,00011,w/2-r,-(h/2-r)
+   k,00012,-(w/2-r),-(h/2-r)
+   
+   ! create interior "picture frame" again for the beams
+   k,10001,-(w/2-r),h/2-t/2
+   k,10002,w/2-r,h/2-t/2
+   k,10003,w/2-t/2,h/2-r
+   k,10004,w/2-t/2,-(h/2-r)
+   k,10005,w/2-r,-(h/2-t/2)
+   k,10006,-(w/2-r),-(h/2-t/2)
+   k,10007,-(w/2-t/2),-(h/2-r)
+   k,10008,-(w/2-t/2),h/2-r
+   
+   ! create straight lines in SPECIFIC ORDER going clockwise around shape
+   l,10001,10002 ! end - 7
+   larc,10002,10003,00010,r-t/2 ! end - 3
+   l,10003,10004 ! end - 6
+   larc,10004,10005,00011,r-t/2 ! end - 2
+   l,10005,10006 ! end - 5
+   larc,10006,10007,00012,r-t/2 ! end - 1
+   l,10007,10008 ! end - 4
+   larc,10008,10001,00009,r-t/2 ! end - 0
+   
+   ! again get last defined for reference
+   *get,lmaxO,line,0,num,maxd
+   
+   ! create interior "picture frame" again for the beams
+   k,30001,-(w/2-r),h/2-t/2,d
+   k,30002,w/2-r,h/2-t/2,d
+   k,30003,w/2-t/2,h/2-r,d
+   k,30004,w/2-t/2,-(h/2-r),d
+   k,30005,w/2-r,-(h/2-t/2),d
+   k,30006,-(w/2-r),-(h/2-t/2),d
+   k,30007,-(w/2-t/2),-(h/2-r),d
+   k,30008,-(w/2-t/2),h/2-r,d
+   
+   ! create guide points for curves
+   k,30009,-(w/2-r),h/2-r,d
+   k,30010,w/2-r,h/2-r,d
+   k,30011,w/2-r,-(h/2-r),d
+   k,30012,-(w/2-r),-(h/2-r),d
+   
+   ! create straight lines in SPECIFIC ORDER going clockwise around shape
+   l,30001,30002 ! end - 7
+   larc,30002,30003,30010,r-t/2 ! end - 3
+   l,30003,30004 ! end - 6
+   larc,30004,30005,30011,r-t/2 ! end - 2
+   l,30005,30006 ! end - 5
+   larc,30006,30007,30012,r-t/2 ! end - 1
+   l,30007,30008 ! end - 4
+   larc,30008,30001,30009,r-t/2 ! end - 0
+
+   ! again get last defined for second edge
+   *get,lmaxF,line,0,num,maxd
+   
+   ! create depth guides
+   l,10001,30001
+   l,10002,30002
+   l,10003,30003
+   l,10004,30004
+   l,10005,30005
+   l,10006,30006
+   l,10007,30007
+   l,10008,30008
+   
+   ! again get last defined for guides
+   *get,lmaxG,line,0,num,maxd
+   
+   view,iso
+   
+   ! Most complicated section: by the right-hand rule, orient all areas so that they face outward
+   *do,i,0,6
+   al,lmaxF-i-1,lmaxG-i,lmaxO-i-1,lmaxG-i-1
+   *enddo
+   !al,lmaxF-7,lmaxG-6,lmaxO-7,lmaxG-7
+   !al,lmaxF-6,lmaxG-5,lmaxO-6,lmaxG-6
+   !al,lmaxF-5,lmaxG-4,lmaxO-5,lmaxG-5
+   ! (etc...)
+   ! Last one loops around:
+   al,lmaxF,lmaxG-7,lmaxO,lmaxG
+   
+   ! Set element types
+   et,1,281 ! shell with in-plane stresses
+   sectype,1,shell
+   secdata,t,1,0.0,3
+   secoffset,mid
+   aesize,all,((h+w)/2)/30
+   amesh,all
+   
+   ! Apply surface loading before the creation of beam side elements
+   sfe,all,1,pres,,pressure
+   
+   ! create beam elements
+   et,2,189
+   ! only select last eight lines (rhs) and the original eight lines (lhs)
+   ! also by some dumb luck the original eight lines don't get reassigned when we compress all line numbers
+   lsel,s,line,,lmaxF-7,lmaxF
+   lsel,a,line,,lmaxO-7,lmaxO
+   
+   sectype,2,beam,rect
+   latt,,,2,,,,2
+   secdata,bh,bb ! temporarily size beam
+   lesize,all,t/2
+   lmesh,all
+   /eshape,1
+   eplot
+   
+   time,1
+   lswrite,1
+*endif
+
+!/psf,pres,norm,2,1,on
+
+d,NODE(0,h/2,0),ux,0
+d,NODE(0,h/2,d),ux,0
+d,NODE(0,h/2,d),roty,0
+d,NODE(0,h/2,0),roty,0
+d,NODE(0,h/2,0),rotz,0
+d,NODE(0,h/2,d),rotz,0
+d,NODE(0,-h/2,0),rotz,0
+d,NODE(0,-h/2,d),rotz,0
+
+d,NODE(-w/2,0,0),uy,0
+d,NODE(w/2,0,0),uy,0
+d,NODE(-w/2,0,d),uy,0
+d,NODE(w/2,0,d),uy,0
+d,NODE(-w/2,0,d),uz,0
+d,NODE(w/2,0,d),uz,0
+
+d,NODE(-w/2,0,0),rotz,0
+d,NODE(w/2,0,0),rotz,0
+d,NODE(-w/2,0,d),rotz,0
+d,NODE(w/2,0,d),rotz,0
+
+eplot
+/wait,1
+
+/solu
+antype,static
+nlgeom,on
+nsubst,250,2500,250
+outres,all,all
+!ncnv,0,0,0,300
+solve
+
+end = UY(NODE((w/2-r),h/2-t/2,0))
+mp = UY(NODE((w/2-r),h/2-t/2,d/2))
+
+! /solu
+! antype,transient
+! nlgeom,on
+! nsubst,50
+! outres,all,all
+! outres,svar,all
+! autots,off
+! deltim,0.005 ! 0.01 - default
+! ncnv,0,0,0,300
+! lssolve,1,1,1
+
+/post1
+/gline,1,-1
+plesol,s,x ! x - radial direction
+
+! set,last
+! etable,method,svar,1
+! etable,torc,svar,2
+! etable,sI,svar,3
+! etable,E,svar,4
+! etable,nu,svar,5
+! pletab,sI,avg
+
+! r = 5
+! uy = UY(NODE(-w/2 + r, h/2,0))
+
+! *msg,ui,uy
+! UY: %g
+
+
+! ! case (1) : 1.027530915E-002
+! ! case (2) : 2.132968741E-002
+! ! case (3) : 7.837300

@@ -1,0 +1,58 @@
+rs
+
+/prep7
+k,,0,0
+k,,1,0
+k,,7,0
+
+l,1,2
+l,2,3
+
+et,1,189
+mp,ex,1,10000000000
+mp,prxy,1,0
+
+sectype,1,beam,T,tb
+!secoffset,cent
+secdata,0.080,0.080,0.020,0.020
+secoffset,origin
+
+secplot,1
+/wait,1
+/pbc,all,,1 ! setup view options
+/psf,pres,norm,2,1,on ! Show pressures on model (normal)
+/psf,pres,tanx,2,1,on ! Show pressures on model (tanx)
+/psf,pres,tany,2,1,on ! Show pressures on model (tany)
+/eshape,1 ! show true cross-sections
+
+lesize,all,0.1
+lmesh,all
+eplot
+/VIEW,1,0.857855715998 , -0.426494903675    ,  0.286680427775
+/ANG,   1,  -69.7159240551
+/replot
+
+d,NODE(1,0,0),uy,0,,,,ux,uz,rotx,rotz
+d,NODE(7,0,0),uy,0,,,,uz,rotx,rotz
+
+esel,s,cent,x,1,7
+/replot
+
+sfbeam,all,1,pres,10
+esel,all
+/replot
+
+f,NODE(0,0,0),fz,-24
+
+/solu
+outres,all,all
+solve
+
+/post1
+set,first
+pldisp,0
+plesol,s,xz,0,1
+plesol,s,x,0,1
+
+*get,sxm,node,NODE(4.4,0,0),s,x
+*get,sxzm,node,NODE(1,0,0),s,xz

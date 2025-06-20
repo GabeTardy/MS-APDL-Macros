@@ -1,0 +1,232 @@
+rs
+! 0 - false, 1 - true
+appendData = 1
+
+! Set up all loading possibilities
+*dim,loadings,array,2
+loadings(1) = 25, 150 !, 100 ! 1, 5, 
+*get,nLoadings,parm,loadings,dim,x
+
+! Set up all cell size possibilities
+!*dim,cellSizes,array,4
+!cellSizes(1) = 0.01, 0.05, 0.1, 0.5
+*dim,cellSizes,array,4
+cellSizes(1) = 1, 0.75, 0.5, 0.25 !, 0.1
+*get,ncellSizes,parm,cellSizes,dim,x
+
+! Set up all curvature possibilities
+*dim,curvatures,array,9
+curvatures(1) = -0.4, -0.3, -0.2, -0.1, 0, 0.1, 0.2, 0.3, 0.4
+!*dim,curvatures,array,4
+!curvatures(1) = -0.4,-0.2,0.2,0.4
+*get,nCurvatures,parm,curvatures,dim,x
+
+! for progress bar:
+runCounter = 0 ! runs
+totalRuns = nLoadings*ncellSizes*nCurvatures
+runTime = 0 ! seconds
+avgRuntime = 62.347 ! seconds
+
+! get current time (in hours)
+*get,startTime,active,,time,wall
+*get,currTime,active,,time,wall
+projEnd = startTime + totalRuns*avgRuntime/3600
+
+
+*if,appendData,eq,0,then
+	*cfopen,'cs','csv'
+	*vwrite,'Load','Cell Size (Thickness=1/10)','Curvature','Strain (C)','Stress (C)','E (C)','Strain (T)','Stress (T)','E (T)','n'
+%C,%C,%C,%C,%C,%C,%C,%C,%C,%C
+	*cfclos
+*endif
+
+prevN = 0
+
+/prep7
+et,1,189
+sectype,1,beam,rect
+mp,ex,1,10000e3
+mp,prxy,1,0.3
+mp,dens,1,0.079
+
+*do,loadI,1,nLoadings
+*do,csI,1,ncellSizes
+*do,curvI,1,nCurvatures
+
+! note: nint = nearest int = round
+! floor(x) = round(x - 1/2)
+
+*msg,ui,nint(projEnd-0.5),nint((projEnd-nint(projEnd-1/2))*60-1/2),nint(currTime-0.5),nint((currTime-nint(currTime-1/2))*60-1/2),nint(projEnd-currTime-0.5),nint((projEnd-currTime-nint(projEnd-currTime-1/2))*60-1/2),nint(runCounter/totalRuns*100*100)/100
+Expected to be complete at %g:%g. %/ Current time: %g:%g - Remaining: %g:%g %/ Completion: %g%%
+/wait,1
+
+load = loadings(loadI)
+cs  = cellSizes(csI)
+curv = curvatures(curvI)
+
+! set thickness in x-y plane, thickness in z dir
+secdata,cs/10,cs/10
+
+*msg,ui,load,cs,curv,prevN,runCounter/totalRuns*100
+Now processing load=%g, cell size=%g, curvature=%g, tension, previous n=%g %/ Completion: %g %%
+
+convergenceCheck = 1
+
+csn,10,10,cs,cs,0.25,curv,2,0,-1
+
+/eshape,1
+lmesh,all
+
+! select rhs
+nsel,s,loc,x,csnMaxX,csnMaxX
+nplot
+
+! tension
+*do,i,0,nCopiesY,1
+! the magnitude of the force should be divided by two for end nodes due to the discretization
+	*if,i,eq,0,then
+		isFoL = 2 ! is first or last is true
+	*elseif,i,eq,nCopiesY,then
+		isFoL = 2 ! is first or last is true
+	*else
+		isFoL = 1 ! is first or last is false
+	*endif
+	fk,KP(csnMaxX,ch*i,0),fx,load/h/isFoL
+*enddo
+ftran
+stressMag = load/h/(cs/10)
+
+! select lhs
+nsel,s,loc,x,0,0
+nplot
+
+! fixed end
+d,all,all
+
+! select all
+nsel,all
+
+! set view options
+/pbc,all,,1
+/psf,pres,norm,1,0,1
+eplot
+
+/solu
+nlgeom,on
+!semiimplicit
+neqit,1000
+nsubst,50
+time,1
+arclen,on,25,10e-7
+autots,off
+outres,all,all
+ncnv,0 ! ignore unconvergence
+solve
+
+! determine current convergence state
+! 0 - not converged
+! 1 - converged
+*get,indivConverge,active,0,solu,cnvg
+! by multiplying convergence check by this value
+! and then the computed n by the convergence check
+! if either tension or compression doesn't converged
+! then we won't get a result
+convergenceCheck = convergenceCheck*indivConverge
+
+*msg,ui,load,cs,curv,prevN,runCounter/totalRuns*100
+Now processing load=%g, cell size=%g, curvature=%g, compression, previous n=%g %/ Completion: %g %%
+
+/post1
+set,last
+plns,u,x
+
+alldx = 0
+*do,i,0,nCopiesY,1
+	alldx = alldx + UX(NODE(csnMaxX, ch*i, 0))
+*enddo
+dxT = alldx/nCopiesY
+
+! select rhs
+/prep7
+*do,i,0,nCopiesY,1
+! the magnitude of the force should be divided by two for end nodes due to the discretization
+	*if,i,eq,0,then
+		isFoL = 2 ! is first or last is true
+	*elseif,i,eq,nCopiesY,then
+		isFoL = 2 ! is first or last is true
+	*else
+		isFoL = 1 ! is first or last is false
+	*endif
+	fk,KP(csnMaxX,ch*i,0),fx,-load/h/isFoL
+*enddo
+ftran
+
+! select all
+nsel,all
+eplot
+
+/solu
+solve
+
+! determine current convergence state
+! 0 - not converged
+! 1 - converged
+*get,indivConverge,active,0,solu,cnvg
+! by multiplying convergence check by this value
+! and then the computed n by the convergence check
+! if either tension or compression doesn't converged
+! then we won't get a result
+convergenceCheck = convergenceCheck*indivConverge
+
+/post1
+set,last
+plns,u,x
+
+alldx = 0
+*do,i,0,nCopiesY,1
+	alldx = alldx + UX(NODE(csnMaxX, ch*i, 0))
+*enddo
+dxC = alldx/nCopiesY
+
+*msg,ui,-dxT/dxC*convergenceCheck
+n (dxC/dxT): %g
+
+prevN = -dxT/dxC*convergenceCheck
+
+! calculate stress and strain
+strainC = dxC/w
+stressC = -stressMag
+
+strainT = dxT/w
+stressT = stressMag
+
+*cfopen,'cs','csv',,append
+*vwrite,load,cs,curv,strainC,stressC*convergenceCheck,stressC/strainC*convergenceCheck,strainT,stressT,stressT/strainT*convergenceCheck,-dxT/dxC*convergenceCheck
+%g,%g,%g,%g,%g,%g,%g,%g,%g,%g
+*cfclos
+
+/prep7
+lsel,all
+ksel,all
+lclear,all
+ldele,all
+kdele,all
+
+*get,currTime,active,,time,wall
+runTime = 3600*(currTime-startTime)
+runCounter = runCounter + 1
+avgRuntime = runTime/runCounter
+projEnd = startTime + totalRuns*avgRuntime/3600
+
+*enddo
+*enddo
+*enddo
+
+*cfclos
+
+hours = nint((runTime/3600 - 0.5)) > 0 ! will return maximum of two values (JANK!)
+minutes = nint((runTime/3600 - hours)*60 - 0.5) > 0
+seconds = nint((runTime/3600 - hours - minutes/60)*3600 - 0.5) > 0
+
+*msg,ui,hours,minutes,seconds,runCounter,avgRuntime
+Tests complete. %/ Total runtime: %g:%g:%g %/ Over %g runs each run took on average %g seconds.

@@ -1,0 +1,37 @@
+rs
+! confirm behavior of pressure command
+
+! create 10x10 area
+/prep7
+k,,-5,-5
+k,,-5, 5
+k,, 5, 5
+k,, 5,-5
+a,1,2,3,4
+
+et,1,281
+sectype,1,shell
+secdata,0.1,1,0.0,3
+secoffset,mid
+aesize,all,0.5
+amesh,all
+
+! constrain edges
+/solu
+dl,all,all,all
+
+! apply pressure
+sfe,all,1,pres,,1
+
+! material
+mp,ex,1,29000e3
+mp,prxy,1,0.3
+
+antype,static
+nlgeom,on
+nsubst,500,5000,500
+arclen,on,10,1/10000
+solve
+
+/post1
+pldisp,0

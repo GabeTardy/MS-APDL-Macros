@@ -1,0 +1,151 @@
+finish 
+/clear 
+! Step 0 
+m = 3/4
+zeta = 1/5
+tau0 = 80
+n = 2 
+lambda = 1/50 
+a0 = 1 
+L = a0/lambda 
+d = a0*(3*m)**(0.5) 
+b = 2*d 
+E = 100000000
+nu = 0 
+rho = 0.0975 
+Izz = b*d**3/12 
+Ar = b*d 
+Pi = 3.1415926535
+omega = (pi/L)**2*(E*Izz/rho/Ar)**(0.5) 
+alpha = zeta*omega 
+beta = 0 
+t0 = tau0/omega 
+! Step 1: Define Element Types 
+/prep7 
+ET,1,189 
+! Step 2: Define Material Properties 
+MP,EX,1,E 
+MP,PRXY,1,nu 
+MP,DENS,1,rho 
+! Step 3: Define beam section 
+sectype,1,beam,rect 
+secdata,d,b 
+! Step 4: Create Keypoints and Lines 
+pi = 3.1415926538 
+num = 50
+*do,i,1,num 
+ x = (L)/(num - 1)*(i-1) 
+ y = a0*sin(pi*x/L) 
+ k,,x,y,0 
+ *if,i,ne,1,then 
+ l,i-1,i 
+ *endif 
+*enddo 
+! Step 5: Set the mesh size 
+!lesize,all,,,25 
+! Step 6: Mesh the model 
+lmesh,all 
+! Step 7: Define analysis type 
+/solu 
+antype,transient 
+! Step 8: Set solution options 
+nlgeom,on 
+autots,off 
+deltim,pi/(20*omega) 
+alphad,alpha
+betad,beta 
+kbc,0 
+outres,all,all 
+! Step 9: Apply boundary conditions 
+d,NODE(0,0,0),ux,0,,,,uy,uz,rotx,roty 
+d,NODE(L,0,0),ux,0,,,,uy,uz,rotx,roty 
+! Step 10: Apply Loads on Load Step 1 
+! Step 10: Apply Loads 
+q0 = n*E*Izz*a0*(pi/L)**4 
+*get,nelem,elem,,count 
+*do,i,1,nelem 
+ 
+ *if,i,eq,1,then 
+ x1 = NX(1) 
+ y1 = NY(1) 
+ x2 = NX(2) 
+ y2 = NY(2) 
+ *else 
+ x1 = NX(2*i-2) 
+ y1 = NY(2*i-2) 
+ x2 = NX(2*i) 
+ y2 = NY(2*i) 
+ *endif 
+ 
+ dy = y2-y1 
+ dx = x2-x1 
+ 
+ ang = atan(dy/dx) 
+ q1 = q0*sin(pi*x1/L) 
+ q2 = q0*sin(pi*x2/L) 
+ 
+ sfbeam,i,2,pres,q1*cos(ang),q2*cos(ang) 
+ sfbeam,i,3,pres,-q1*sin(ang),-q2*sin(ang) 
+ 
+*enddo 
+time,n*t0 
+lswrite,1 
+! Step 11: Apply Loads on Load Step 2 
+! Step 10: Apply Loads 
+
+q0 = 0
+*get,nelem,elem,,count 
+*do,i,1,nelem 
+ 
+ *if,i,eq,1,then 
+ x1 = NX(1) 
+ y1 = NY(1) 
+ x2 = NX(2) 
+ y2 = NY(2) 
+ *else 
+ x1 = NX(2*i-2) 
+ y1 = NY(2*i-2) 
+ x2 = NX(2*i) 
+ y2 = NY(2*i) 
+ *endif 
+ 
+ dy = y2-y1 
+ dx = x2-x1 
+ 
+ ang = atan(dy/dx) 
+ q1 = q0*sin(pi*x1/L) 
+ q2 = q0*sin(pi*x2/L) 
+ 
+ sfbeam,i,2,pres,q1*cos(ang),q2*cos(ang) 
+ sfbeam,i,3,pres,-q1*sin(ang),-q2*sin(ang) 
+ 
+*enddo 
+time,2*n*t0 
+lswrite,2 
+! Step 12: Solve 
+lssolve,1,2,1 
+! Step 13: Plot y-displacement at peak of arch 
+/post26 
+nsol,2,NODE(L/2,a0,0),u,y,UY 
+plvar,2 
+! Step 14: Output Data 
+vget,time,1 
+vget,dispy,2 
+! *cfopen,'your_path_here','csv'
+! *vwrite,time(1),dispy(1) 
+! %G %G 
+! *cfclos 
+*cfopen,'geom2DT','csv'
+*vwrite,'a0','E','I','L','n','p','A','t0'
+%C,%C,%C,%C,%C,%C,%C,%C
+*vwrite,a0,E,Izz,L,n,omega,Ar,t0
+%G,%G,%G,%G,%G,%G,%G,%G
+*cfclos
+
+*cfopen,'results2DT','csv'
+*vwrite,'t','uz'
+%C,%C
+
+*vwrite,time(1),dispy(1) 
+%G,%G 
+*cfclos

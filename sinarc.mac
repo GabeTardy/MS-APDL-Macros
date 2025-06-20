@@ -1,0 +1,24 @@
+length=ARG1
+ndivs=ARG2
+*if,ndivs,eq,0,then
+	ndivs = length
+*endif
+
+a=ARG3 ! rise of arch
+z=ARG4 ! toggle whether up is z or whatever
+e=ARG5 ! geometric imperfection constant
+pi=3.1415926535
+
+/prep7
+ndivs = ndivs*2
+step = length/ndivs
+
+k,1
+*do,i,1,ndivs
+	*if,z,eq,0,then
+		k,i+1,i*step,a*sin(pi*(i*step)/length)+a*e*sin(2*pi*i*step/length)
+	*else
+		k,i+1,i*step,0,a*sin(pi*(i*step)/length)+a*e*sin(2*pi*i*step/length)
+	*endif
+	l,i,i+1
+*enddo

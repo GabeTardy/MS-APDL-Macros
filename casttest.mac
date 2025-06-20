@@ -1,0 +1,70 @@
+/clear 
+! 0.015153
+
+*get,timeOrig,active,,time,wall
+
+Et = 45e6
+Ec = 100e6
+nut = 0.3
+nuc = 0.3
+
+/prep7  
+k
+k,2,10,0,0  
+l,1,2   
+
+et,1,189
+sectype,1,beam,rect,main,0
+secdata,1,1,20,2 ! add extra integration points thorughout height
+!secdata,1,1
+lesize,all,,,55
+lmesh,1
+
+! tb,user,1,1,4
+! tbtemp,0
+! tbdata,1,Et,Ec,nut,nuc
+
+mp,ex,1,Ec
+mp,prxy,1,0 !0.27
+
+! tb,cast,1,1,1,isotropic
+! tb,uniaxial,1,1,3,tens
+! tbpt,,0,0
+! tbpt,,0.00000001,0.00000001*Ec
+! tbpt,,1,Et
+! tbpt,,2,2*Et
+! tbpt,,3,3*Et
+
+! tb,uniaxial,1,1,2,compression
+! tbpt,,0,0
+! tbpt,,1,Ec
+! tbpt,,2,2*Ec
+! tbpt,,3,3*Ec
+
+/solu
+d,NODE(0,0,0),all,0, , , ,uy,uz,rotx,roty,rotz
+!f,NODE(10,0,0),mz,100
+sfbeam,all,2,pres,1,1 ! 100,100
+
+nlgeom,on
+time,1
+nsubst,100
+arclen,on,1
+autots,off
+outres,all,all
+solve
+
+/post1
+pldisp,0
+
+set,last
+/eshape,1
+/dscale,all,auto
+!plnsol,s,x,0,1
+plns,u,y
+
+*get,timeFinal,active,,time,wall
+dTime = 3600*(timeFinal - timeOrig)
+
+*msg,ui,dTime
+Time taken: %g

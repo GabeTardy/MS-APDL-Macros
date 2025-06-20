@@ -1,0 +1,382 @@
+rs
+
+/replot
+/pnum,mat,1
+/number,1
+/dscale,all,0
+
+! Inputs
+w = 4
+h = 1
+Emother = 10000e3
+nCases = 5
+
+substeps = 30
+
+metaArea = w*h
+
+*dim,sizing,array,4
+sizing(1) = 1/3,0.3,0.25,0.2
+
+!*dim,sizing,array,10
+!sizing(1) = 1/3,0.3,0.25,0.2,0.175,0.125,1/16,1/32,1/64,0.014
+!*dim,sizing,array,1
+!sizing(1) = 0.3
+*get,sizeOptions,parm,sizing,dim,x
+
+*dim,thickness,array,6
+thickness(1) = 1/3,1/4,1/5,1/7,1/10,1/15
+!*dim,thickness,array,1
+!thickness(1) = 1/3
+*get,thicknessOptions,parm,thickness,dim,x
+
+*dim,formattedData,array,nCases*2 + 1,sizeOptions,thicknessOptions
+
+! make material on the edge 50x/100x whatever your base material is
+! for displacement in the y direction, select node in the middle of he top edge
+
+/prep7
+et,1,189
+seltol,0.001
+ 
+! aluminium
+mp,ex,1,Emother
+mp,prxy,1,0.31
+mp,dens,1,0.0975
+
+mp,ex,2,Emother*1000 ! test material that is 1000x the stiffness of aluminium
+mp,prxy,2,0
+mp,dens,2,0.1 ! not sure if this has bearing on anything but whatever lol
+
+lesize,all,,,1
+sectype,1,beam,rect
+
+! clear old data from elasticityMaster.csv
+*cfopen,'elasticityMaster',csv
+*vwrite,'Thickness Ratio (in/in)','Cell Size (in)','%Ex (Aux)','%Ey (Aux)','%Ex (Aux Rot)','%Ey (Aux Rot)','%Ex (Hex)','%Ey (Hex)','%Ex (ZZ)','%Ey (ZZ)','%Ex (Re-Ent)','%Ey (Re-Ent)'
+%C,%C,%C,%C,%C,%C,%C,%C,%C,%C,%C,%C
+*cfclos
+
+*cfopen,'elasticityData',csv
+*vwrite,'Thickness Ratio (in/in)','Case','Cell Size (in)','σxx (psi)','σyy (psi)','εxx (in/in)','εyy (in/in)','ExxT (psi)','ExxC (psi)','nx','EyyT (psi)','EyyC (psi)','ny','Nondim Cell Ratio (in2/in2)','Emxx/Emother (psi/psi)','Emyy/Emother (psi/psi)','Comp Time (s)','# Nodes'
+%C,%C,%C,%C,%C,%C,%C,%C,%C,%C,%C,%C,%C,%C,%C,%C,%C,%C
+
+*do,thickIndex,1,thicknessOptions
+	thk = thickness(thickIndex)
+
+	*do,case,1,nCases
+		*do,i,1,sizeOptions
+			! get current time (in hours and decimal hours)
+			*get,timeOrig,active,,time,wall
+			
+			! get index-based variables
+			sz = sizing(i)
+			
+			test = i
+			
+			nCellsV = NINT(h/(3*sz))
+			*if,case,eq,2,and,nCellsV-1,lt,1,then
+				*msg,ui,'Results for this set of conditio','ns are not meaningful.'
+%C%C
+				*vwrite,thk,case,sz,'','','','','','','','','','','','','','',''
+%G,%G,%G,%C,%C,%C,%C,%C,%C,%C,%C,%C,%C,%C,%C,%C,%C,%C
+				*cycle
+			*endif
+			
+			*msg,ui,case,sz,thk
+Now processing Case %g, Cell Size %g, Thickness Ratio %g
+			
+			thkActual = sz*thk
+			*if,case,eq,3,then
+				createSolid,sz,sqrt(3)/2*sz,w,h,3
+			*else
+				createSolid,sz,sz,w,h,case
+			*endif
+			nummrg,all
+			secdata,thkActual,thkActual
+			
+			! find maximum width/height
+			! most extreme keypoint always in the top right corner
+			*get,maxKP,kp,,num,maxd
+			maxX = KX(maxKP)
+			maxY = KY(maxKP)
+			
+			!------------------------------------- EXX CALCULATION
+			
+			! select right side and assign rigid material
+			lsel,s,loc,x,maxX
+			latt,2
+			lsel,all
+			
+			! mesh all
+			lmesh,all
+			eplot
+			/replot
+			
+			! pin the left side
+			nsel,s,loc,x,0
+			d,all,all
+			nsel,all
+			
+			! put the forces on the right side
+			nsel,s,loc,x,maxX
+			*get,numR,node,,count ! gets the number of nodes CURRENTLY SELECTED, therefore only the nodes on the right side
+			f,all,fx,1/numR ! apply a 1/numNodes force on the side
+			nsel,all
+			
+			eplot
+			/replot
+			
+			! solve
+			/solu
+			nlgeom,on
+			nsubst,substeps
+			time,1
+			arclen,on,1
+			autots,off
+			outres,all,all
+			solve
+			*msg,ui,case,sz,thk
+Now displaying Case %g, Cell Size %g, Thickness Ratio %g, UX
+			
+			/post1
+			pldisp,0
+			/wait,0.5
+			nsort,u,x,,1
+			*get,maxUX,sort,,max
+			
+			! Select only the top side to average out their displacements
+			nsel,s,loc,X,maxX
+			k=0
+			sumUX=0
+			*do,j,1,numR
+				k = NDNEXT(k)
+				sumUX = sumUX + UX(k) ! add the displacement to the summation
+				*status,k
+			*enddo
+			nsel,all
+			esel,all
+			
+			
+			avgUX = sumUX/numR
+			
+			midUY = UY(NODE(h,w/2,0))
+			
+			stressXXT = 1/(h*thkActual)
+			strainXXT = avgUX/w
+			
+			ExxT = stressXXT/strainXXT
+			
+			! --- begin 2024 changes --- !
+			/prep7
+			nsel,s,loc,x,maxX
+			*get,numR,node,,count ! gets the number of nodes CURRENTLY SELECTED, therefore only the nodes on the right side
+			f,all,fx,-1/numR ! apply a -1/numNodes force on the side (compression)
+			nsel,all
+			
+			! solve
+			/solu
+			nlgeom,on
+			nsubst,substeps
+			time,1
+			arclen,on,1
+			autots,off
+			outres,all,all
+			solve
+			*msg,ui,case,sz,thk
+Now displaying Case %g, Cell Size %g, Thickness Ratio %g, UX
+			
+			/post1
+			pldisp,0
+			/wait,0.5
+			nsort,u,x,,1
+			*get,maxUX,sort,,max
+			
+			! Select only the top side to average out their displacements
+			nsel,s,loc,X,maxX
+			k=0
+			sumUX=0
+			*do,j,1,numR
+				k = NDNEXT(k)
+				sumUX = sumUX + UX(k) ! add the displacement to the summation
+				*status,k
+			*enddo
+			nsel,all
+			esel,all
+			
+			
+			avgUX = sumUX/numR
+			
+			midUY = UY(NODE(h,w/2,0)) ! 2024 - should be w/2, h, 0?????
+			
+			stressXXC = -1/(h*thkActual)
+			strainXXC = avgUX/w
+			
+			ExxC = stressXXC/strainXXC
+			! --- end 2024 changes --- !
+			
+			! CLEAR ALL LOADS AND LINE-BASED ELEMENTS
+			/prep7
+			lsclear,all
+			lclear,all
+			*msg,ui,case,sz,thk
+Now processing Case %g, Cell Size %g, Thickness Ratio %g
+			
+			!------------------------------------------- EYY CALCULATIONS
+			
+			! reassign default material to all lines
+			latt,1
+			
+			! select top side and assign rigid material
+			lsel,s,loc,y,maxY
+			latt,2
+			lsel,all
+			
+			! mesh all
+			lmesh,all
+			eplot
+			/replot
+			
+			! pin the bottom side
+			nsel,s,loc,y,0
+			d,all,all
+			nsel,all
+			
+			! put the forces on the top side
+			nsel,s,loc,y,maxY
+			*get,numR,node,,count ! gets the number of nodes CURRENTLY SELECTED, therefore only the nodes on the right side
+			f,all,fy,1/numR ! apply a 1/numNodes force on the side
+			nsel,all
+			
+			eplot
+			/replot
+			
+			! solve
+			/solu
+			nlgeom,on
+			nsubst,substeps
+			time,1
+			arclen,on,1
+			autots,off
+			outres,all,all
+			solve
+			*msg,ui,case,sz,thk
+Now displaying Case %g, Cell Size %g, Thickness Ratio %g, UY
+			
+			/post1
+			nsort,u,y,,1
+			*get,maxUY,sort,,max
+			
+			! Select only the right side to average out their displacements
+			nsel,s,loc,y,maxY
+			k=1
+			sumUY=0
+			*do,j,1,numR
+				! We assume that node number 1 is NOT on the right side of the model (it will never be with our current setup)
+				k = NDNEXT(k)
+				sumUY = sumUY + UY(k) ! add the displacement to the summation
+			*enddo
+			nsel,all
+			esel,all
+			
+			avgUY = sumUY/numR
+			
+			stressYYT = 1/(w*thkActual)
+			strainYYT = avgUY/w
+			
+			EyyT = stressYYT/strainYYT
+			*status,ExxT
+			
+			! --- begin 2024 changes --- !
+			/prep7
+			! put the forces on the top side
+			nsel,s,loc,y,maxY
+			*get,numR,node,,count ! gets the number of nodes CURRENTLY SELECTED, therefore only the nodes on the right side
+			f,all,fy,-1/numR ! apply a -1/numNodes force on the side (compression)
+			nsel,all
+			
+			eplot
+			/replot
+			
+			! solve
+			/solu
+			nlgeom,on
+			nsubst,substeps
+			time,1
+			arclen,on,1
+			autots,off
+			outres,all,all
+			solve
+			*msg,ui,case,sz,thk
+Now displaying Case %g, Cell Size %g, Thickness Ratio %g, UY
+			
+			/post1
+			nsort,u,y,,1
+			*get,maxUY,sort,,max
+			
+			! Select only the right side to average out their displacements
+			nsel,s,loc,y,maxY
+			k=1
+			sumUY=0
+			*do,j,1,numR
+				! We assume that node number 1 is NOT on the right side of the model (it will never be with our current setup)
+				k = NDNEXT(k)
+				sumUY = sumUY + UY(k) ! add the displacement to the summation
+			*enddo
+			nsel,all
+			esel,all
+			
+			avgUY = sumUY/numR
+			
+			stressYYC = -1/(w*thkActual)
+			strainYYC = avgUY/w
+			
+			EyyC = stressYYC/strainYYC
+			*status,EyyC
+			!--- end 2024 changes ---!
+			
+			! get final time, get change in time, then convert to seconds and round up
+			*get,timeFinal,active,,time,wall
+			dTime = 3600*(timeFinal - timeOrig)
+			*get,totalNodes,node,,count
+			
+			/post1
+			pldisp,0
+		
+			! Write to master table
+			*vwrite,thk,case,sz,stressXXT,stressYYT,strainXXT,strainYYT,ExxT,ExxC,ExxC/ExxT,EyyT,EyyC,EyyC/EyyT,sz*sz/metaArea,ExxT/Emother,EyyT/Emother,dTime,totalNodes
+%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g
+
+			*status,test
+			*if,test,ne,0,then
+				formattedData(2*case,test,thickIndex) = ExxT/Emother
+				formattedData(2*case+1,test,thickIndex) = EyyT/Emother
+			*endif
+			
+			/wait,0.5
+			/prep7
+			lsel,all
+			ksel,all
+			lclear,all
+			ldele,all
+			kdele,all
+		*enddo
+	*enddo
+	
+	! close out of elasticityData.csv
+	*cfclos
+	
+	! open elasticityMaster.csv
+	*cfopen,'elasticityMaster',csv,,append
+	*do,i,1,sizeOptions
+		sz = sizing(i)
+		*vwrite,thk,sz,formattedData(2,i,thickIndex),formattedData(3,i,thickIndex),formattedData(4,i,thickIndex),formattedData(5,i,thickIndex),formattedData(6,i,thickIndex),formattedData(7,i,thickIndex),formattedData(8,i,thickIndex),formattedData(9,i,thickIndex),formattedData(10,i,thickIndex),formattedData(11,i,thickIndex)
+%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g
+	*enddo
+	*cfclos
+
+	! reopen elasticityData.csv
+	*cfopen,'elasticityData',csv,,append
+*enddo
+
+*cfclos

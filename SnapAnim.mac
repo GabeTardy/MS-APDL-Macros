@@ -1,0 +1,11 @@
+! SnapAnim.mac
+! I did not feel like running this every time.
+
+/post1
+/contour,all,18,-2*a,,0
+plns,u,y
+*if,ARG1,eq,0,then
+	antime,fps*3*t0_,1/fps,,,1,1,3
+*else
+	antime,fps*4*t0_,1/fps,,,1,1,4
+*endif ! animates a real-time animation with the specified number of frames per second over the time of the test

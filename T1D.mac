@@ -1,0 +1,78 @@
+! T1D.mac
+
+rs
+! Total length
+l = 10
+
+! Magnitude of moment
+Mex = 10
+
+! Material properties
+nRatio = 2
+Et = 100e6
+Ec = nRatio*Et
+Er = 4*Et*Ec/(sqrt(Et) + sqrt(Ec))**2
+
+nut = 0
+nuc = 0
+
+/prep7
+! cyl4,0,0,0.5
+! voffst,1,10
+
+k
+k,,10,0
+l,1,2
+
+et,1,189
+! et,1,185
+setbimod,0
+mp,dens,1,0.079
+sectype,1,beam,csolid ! ctube
+secdata,0.5,64,4
+
+lesize,all,0.125
+lmesh,all,all
+! vplot
+! vmesh,all
+view,iso
+/eshape,1
+eplot
+
+!f,NODE(0,0,l),mz,Mex
+f,NODE(l,0,0),mx,Mex
+d,NODE(0,0,0),all
+
+time,1
+lswrite,1
+
+! solve
+/solu
+antype,transient
+nlgeom,on
+nsubst,50
+outres,all,all
+outres,svar,all
+autots,off
+deltim,0.01
+ncnv,0,0,0,300
+lssolve,1,1,1
+
+/post1
+set,last
+/dscale,,auto
+pldisp,0
+!ples,s,x
+plesol,s,x
+
+/wait,1
+plesol,s,eqv
+
+! /post1
+! set,last
+! etable,method,svar,1
+! etable,torc,svar,2
+! etable,sI,svar,3
+! etable,E,svar,4
+! etable,nu,svar,5
+! pletab,sI,avg

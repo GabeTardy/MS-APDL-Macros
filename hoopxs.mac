@@ -1,0 +1,58 @@
+! number of curve inner steps
+nis = 25
+zPos = d/2
+rt = (r - t/2)
+
+! total number of curve points: 8 (two for each side) + number of curve steps*4 curves
+path,cent,8+nis*4,8,100 ! (7 - x, y, z, s[unused], sx, sy, uy; 100 - 100 divisions)
+
+! define path for whole object
+! top
+ppath,1,,-(w/2-r),h/2-t/2,zPos
+ppath,2,,(w/2-r),h/2-t/2,zPos
+
+! top right curve
+*do,qqqqq,1,nis
+ang = qqqqq/(nis+1)*pi/2
+ppath,2+qqqqq,,w/2-r + rt*sin(ang),h/2-r + rt*cos(ang),zPos
+*enddo
+
+! right
+ppath,2+nis+1,,w/2-t/2,h/2-r,zPos
+ppath,2+nis+2,,w/2-t/2,-(h/2-r),zPos
+
+! bottom right curve
+*do,qqqqq,1,nis
+ang = qqqqq/(nis+1)*pi/2
+ppath,2+nis*1+2+qqqqq,,w/2-r + rt*cos(ang),-(h/2-r) - rt*sin(ang),zPos
+*enddo
+
+! bottom
+ppath,2+nis*2+2+1,,(w/2-r),-(h/2-t/2),zPos
+ppath,2+nis*2+2+2,,-(w/2-r),-(h/2-t/2),zPos
+
+! bottom left curve
+*do,qqqqq,1,nis
+ang = qqqqq/(nis+1)*pi/2
+ppath,2+nis*2+2+2+qqqqq,,-(w/2-r) - rt*sin(ang),-(h/2-r) - rt*cos(ang),zPos
+*enddo
+
+! left
+ppath,2+nis*3+2+2+1,,-(w/2-t/2),-(h/2-r),zPos
+ppath,2+nis*3+2+2+2,,-(w/2-t/2), (h/2-r),zPos
+
+! top left curve
+*do,qqqqq,1,nis
+ang = qqqqq/(nis+1)*pi/2
+ppath,2+nis*3+2+2+2+qqqqq,,-(w/2-r) - rt*cos(ang),(h/2-r) + rt*sin(ang),zPos
+*enddo
+
+pdef,sx,s,x,noav
+pdef,sy,s,y,noav
+pdef,uy,u,y,noav
+pdef,us,u,sum,noav
+
+eplot
+view,side
+
+plpagm,sy,50

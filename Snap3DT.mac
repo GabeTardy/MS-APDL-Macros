@@ -1,0 +1,203 @@
+! Transient Analysis of Sandwich
+
+! Step 0: setup
+rs ! clearing macro
+/rep ! replot screen
+/pbc,all,,1 ! setup view options
+/psf,pres,norm,2,0,1 ! setup view options
+
+!--------------------------------------------------------------------------
+! Inputs
+m = 1/3
+n = 6
+lambda = 1/50 
+a0 = 1
+zeta = 1/3
+tau = 150
+k = 120*7/tau ! iteration resolution constant. higher = better resolution, longer time taken to simulate
+fps = 60
+
+pMeta = 0.5 ! percent metamaterial
+
+Ex = 10000e3 ! psi
+prxy = 0.0 
+rho = 0.0975
+
+Ex_inner     = 0.264*Ex
+Ey_inner     = 0.383*Ex
+Ez_inner     = 1.000*Ex
+prxy_inner   = -0.35041
+Gxy_inner    = 0.5153*Ex
+rho_inner    = 0.0975
+
+pi = 3.1415926535
+
+ExForLoad = (1-pMeta)*Ex + pMeta*Ex_inner
+
+! dimension calculations
+l = a0/lambda
+ndiv = l
+h = a0*(3*m)**(0.5) 
+b = 0.2*l
+
+! moment of inertia, cross-sectional area, and required load
+Izz = b*(h**3)/12 
+Ar = b*h
+q0 = n*ExForLoad*Izz*a0*(pi/l)**4
+
+!--------------------------------------------------------------------------
+
+seltol,0.001 ! setup selection tolerance (used later for constraints)
+/eshape,1 ! view sections
+
+! Step 1: generate geometry
+sinarc,l,ndiv,a0 ! setup sine arc, 30u long, 120 divisions (60x2), and 1u high.
+
+! create four keypoints at quarter points
+k,,0,0,b/4
+k,,0,0,b/2
+k,,0,0,3*b/4
+k,,0,0,b
+l,1,KP(0,0,b/4)
+l,KP(0,0,b/4),KP(0,0,b/2)
+l,KP(0,0,b/2),KP(0,0,3*b/4)
+l,KP(0,0,3*b/4),KP(0,0,b)
+
+*get,nl,line,,num,maxd
+adrag,all,,,,,,nl-3,nl-2,nl-1,nl ! extrude along the last two lines created
+
+
+! Step 2: mesh, material, section
+mp,ex,1,Ex ! aluminium, ksi
+mp,prxy,1,prxy ! aluminium
+mp,dens,1,rho ! aluminium
+
+mp,ex,2,Ex_inner
+mp,ey,2,Ey_inner
+mp,ez,2,Ez_inner
+mp,prxy,2,prxy_inner
+mp,pryz,2,0
+mp,prxz,2,0
+mp,gxy,2,Gxy_inner
+mp,gyz,2,Gxy_inner
+mp,gxz,2,Gxy_inner
+mp,dens,2,rho_inner
+
+et,1,281
+sectype,1,shell,,sandwich
+secdata,h*(1-pMeta),1,0,3
+secdata,h*pMeta,2,0,3
+
+aesize,all,1000
+amesh,all
+
+/NUMBER,1   
+/PNUM,MAT,1 
+eplot
+/replot
+/wait,1
+
+! Step 3: place loads
+sinloadshell,q0/b,l
+
+! Step 4: place constraints
+nsel,s,loc,x,0
+nsel,a,loc,x,l
+d,all,ux,0,,,,uy,uz,rotx,roty
+nsel,all
+
+eplot
+/rep
+
+finish
+
+/solu
+antype,modal
+mxpand,0,,,0
+lumpm,0
+pstres,0
+modopt,lanb,5,0,0,,off
+solve
+
+*get,firstModeFreq,mode,1,freq
+
+dt = 1/(k*firstModeFreq)
+
+omega_ = firstModeFreq*2*pi
+massDamping_ = zeta*omega_
+t0_ = tau/omega_
+
+! Step 7: solve, dynamic (get dynamic response)
+eplot 
+/replot
+
+*msg,ui,omega_,massDamping_,t0_,dt
+Omega: %g, Alpha: %g, t0: %g, dt: %g
+
+*msg,ui,3*t0_
+Total Expected TIME: %g
+
+/wait,1
+
+finish
+/solu
+antype,transient
+nlgeom,1
+deltim,dt
+alphad,massDamping_
+betad,0
+kbc,0
+lumpm,0
+outres,all,all
+
+! Step 7.2: replace loads
+sinloadshell,q0/b,l
+time,1*t0_
+lswrite,1
+
+sinloadshell,-q0/2/b,l
+time,5/2*t0_
+lswrite,2
+
+sinloadshell,0,l
+time,3*t0_
+lswrite,3
+
+lssolve,1,3,1
+
+! Step 7.3: plot transient analysis
+/post26
+nsol,2,NODE(l/2,a0,b/2),u,y,UY ! load the nodal displacement solution at the center of the arch to time-hist variable 2
+plvar,2
+/wait,5
+
+vget,time,1 
+vget,dispy,2 
+
+*cfopen,'geom3DT','csv'
+*vwrite,'a0','E','I','L','n','p','A','t0'
+%C,%C,%C,%C,%C,%C,%C,%C
+*vwrite,a0,ExForLoad,Izz,l,n,omega_,b*h,t0_
+%G,%G,%G,%G,%G,%G,%G,%G
+*cfclos
+
+*cfopen,'results3DT','csv'
+*vwrite,'t','uz'
+%C,%C
+*vwrite,time(1),dispy(1) 
+%G,%G 
+*cfclos
+
+/post1
+set,first
+
+!pldisp,0
+
+! /contour,all,18,-2*a,,0
+! plns,u,y
+! ! plns,s,eqv
+! ! antime,60,0.01,,1,1,1,3 ! low res
+! antime,fps*3*t0_,1/fps,,,1,1,3 ! animates a real-time animation with the specified number of frames per second over the time of the test
+! *status,PRM_
+
+/prep7

@@ -1,0 +1,126 @@
+! axihoop.mac
+! ARG1:
+! - 0: usermaterial n=5
+! - 1: usermaterial n=1
+! - 2: cast iron n=5
+! - 3: isotropic
+! setup
+rs
+/psf,pres,norm,2
+
+res = 256
+rinner = 1
+router = 2
+Pi = 3.1415926535
+
+fouter = -1 ! unit force/unit length
+finner = -1
+ndiv = 4 ! 10 elements deep
+
+! Calculate arc lengths of representative inner and outer elements
+souter = 2*Pi*router/res
+sinner = 2*Pi*rinner/res
+
+! So the total magnitude of applied pressure on this side should be
+mouter = fouter*souter
+minner = finner*sinner
+
+! Due to the discretization, this magnitude will be split evenly between the two nodes
+! on each side. However, when the individual pressure vectors are merged into the global
+! force vector, the same halved value will be summed twice, giving back the original value.
+! Therefore, a uniform pressure is equivalent to this magnitude applied as a point load at
+! each outer/inner node. 
+
+! generate geometry
+/prep7
+*do,i,1,res
+	! inner
+	k,,rinner*cos(i/res*2*Pi),rinner*sin(i/res*2*Pi)
+	! outer
+	k,,router*cos(i/res*2*Pi),router*sin(i/res*2*Pi)
+	
+	*if,i,gt,1,then
+		a,KP(rinner*cos(i/res*2*Pi),rinner*sin(i/res*2*Pi),0),KP(router*cos(i/res*2*Pi),router*sin(i/res*2*Pi),0),KP(router*cos((i-1)/res*2*Pi),router*sin((i-1)/res*2*Pi),0),KP(rinner*cos((i-1)/res*2*Pi),rinner*sin((i-1)/res*2*Pi),0)
+	*endif
+	*if,i,eq,res,then
+		a,KP(rinner*cos(i/res*2*Pi),rinner*sin(i/res*2*Pi),0),KP(router*cos(i/res*2*Pi),router*sin(i/res*2*Pi),0),KP(router*cos((i+1)/res*2*Pi),router*sin((i+1)/res*2*Pi),0),KP(rinner*cos((i+1)/res*2*Pi),rinner*sin((i+1)/res*2*Pi),0)
+	*endif
+*enddo
+
+! set up a plane element and activate plane strain
+et,1,183
+keyopt,1,3,5
+esize,(router-rinner)/ndiv !0.1
+amesh,all
+
+! set up loading
+*do,i,1,res
+	! inner
+	f,NODE(rinner*cos(i/res*2*Pi),rinner*sin(i/res*2*Pi),0),fx,minner*cos(i/res*2*Pi)
+	f,NODE(rinner*cos(i/res*2*Pi),rinner*sin(i/res*2*Pi),0),fy,minner*sin(i/res*2*Pi)
+	
+	! outer
+	f,NODE(router*cos(i/res*2*Pi),router*sin(i/res*2*Pi),0),fx,mouter*cos(i/res*2*Pi)
+	f,NODE(router*cos(i/res*2*Pi),router*sin(i/res*2*Pi),0),fy,mouter*sin(i/res*2*Pi)
+*enddo
+eplot
+
+!d,NODE((rinner + router)/2,0,0),all,0
+time,1
+lswrite,1
+
+! set up material
+nRatio = 5
+Et = 10000e3
+Ec = nRatio*Et
+nut = 0.3
+nuc = 0.3
+setbimod,ARG1
+mp,dens,1,0.079
+
+! solve
+/solu
+antype,transient
+nlgeom,on
+nsubst,50
+outres,all,all
+outres,svar,all
+autots,off
+deltim,0.01
+ncnv,0,0,0,300
+lssolve,1,1,1
+
+/post1
+set,last
+pldisp,0
+
+/contour,all,256
+/edge,1,0,45
+/gline,1,-1
+rsys,1
+/contour,all,128
+plesol,s,x ! x - radial direction
+
+
+set,last
+etable,method,svar,1
+etable,torc,svar,2
+etable,sI,svar,3
+etable,E,svar,4
+etable,nu,svar,5
+pletab,sI,avg
+
+*cfopen,'axihoop ' + fouter + ' ' + finner,'csv'
+*vwrite,'r','srr'
+%C,%C
+*do,ii,rinner,router,(router-rinner)/ndiv
+	! get radial stress at this point
+	*get,sxtii,node,NODE(-ii,0,0),s,x
+
+	! write to file
+	*vwrite,ii,sxtii
+%G,%G
+*enddo
+*cfclos
+
+!plns,s,r

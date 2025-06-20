@@ -1,0 +1,263 @@
+rs
+
+w = 40 ! width - x
+h = 10 ! height - y
+r = 4.9 ! radius of fillet
+t = 0.1 ! thickness of hoop
+d = 40 ! depth - z 
+
+pressure = 0.1
+
+/prep7
+/PNUM,AREA,1
+
+*if,r,eq,0,then
+   ! create "picture frame"
+   k,1,-w/2,h/2
+   k,2,w/2,h/2
+   k,3,w/2,-h/2
+   k,4,-w/2,-h/2
+
+   k,5,-w/2 + t,h/2 - t
+   k,6,w/2 - t,h/2 - t
+   k,7,w/2 - t,-h/2 + t
+   k,8,-w/2 + t,-h/2 + t
+
+   a,1,2,6,5 ! 1
+   a,2,3,7,6 ! 2
+   a,3,4,8,7 ! 3
+   a,4,1,5,8 ! 4
+   aadd,all
+*else
+   ! Create outer picture frame (00000)
+   k,00001,-(w/2-r),h/2
+   k,00002,w/2-r,h/2
+   k,00003,w/2,h/2-r
+   k,00004,w/2,-(h/2-r)
+   k,00005,w/2-r,-(h/2)
+   k,00006,-(w/2-r),-(h/2)
+   k,00007,-(w/2),-(h/2-r)
+   k,00008,-(w/2),h/2-r
+   
+   ! create guide points for curves
+   k,00009,-(w/2-r),h/2-r
+   k,00010,w/2-r,h/2-r
+   k,00011,w/2-r,-(h/2-r)
+   k,00012,-(w/2-r),-(h/2-r)
+   
+   ! create straight lines
+   l,00001,00002 ! end - 7
+   l,00003,00004 ! end - 6
+   l,00005,00006 ! end - 5
+   l,00007,00008 ! end - 4
+   
+   ! create curved edges
+   larc,00002,00003,00010,r ! end - 3
+   larc,00004,00005,00011,r ! end - 2
+   larc,00006,00007,00012,r ! end - 1
+   larc,00008,00001,00009,r ! end - 0
+   
+   ! Get last defined line number, then fill an area over the last eight lines
+   *get,lmax,line,0,num,maxd
+   al,lmax,lmax-1,lmax-2,lmax-3,lmax-4,lmax-5,lmax-6,lmax-7
+   
+   ! ! Fix the line numbering which is bizarre for whatever reason, idk why
+   ! numcmp,line
+   
+   ! create interior "picture frame" again for the beams
+   k,10001,-(w/2-r),h/2-t/2
+   k,10002,w/2-r,h/2-t/2
+   k,10003,w/2-t/2,h/2-r
+   k,10004,w/2-t/2,-(h/2-r)
+   k,10005,w/2-r,-(h/2-t/2)
+   k,10006,-(w/2-r),-(h/2-t/2)
+   k,10007,-(w/2-t/2),-(h/2-r)
+   k,10008,-(w/2-t/2),h/2-r
+   
+   ! Guide points for curves are the same, so we don't need to redefine them
+   
+   ! create straight lines
+   l,10001,10002 ! end - 7
+   l,10003,10004 ! end - 6
+   l,10005,10006 ! end - 5
+   l,10007,10008 ! end - 4
+   
+   ! create curved edges
+   larc,10002,10003,00010,r-t/2 ! end - 3
+   larc,10004,10005,00011,r-t/2 ! end - 2
+   larc,10006,10007,00012,r-t/2 ! end - 1
+   larc,10008,10001,00009,r-t/2 ! end - 0
+   
+   ! again get last defined and fill
+   *get,lmaxO,line,0,num,maxd
+   al,lmaxO,lmaxO-1,lmaxO-2,lmaxO-3,lmaxO-4,lmaxO-5,lmaxO-6,lmaxO-7
+   
+   ! create interiormost "picture frame" again for the pressure
+   k,20001,-(w/2-r),h/2-t
+   k,20002,w/2-r,h/2-t
+   k,20003,w/2-t,h/2-r
+   k,20004,w/2-t,-(h/2-r)
+   k,20005,w/2-r,-(h/2-t)
+   k,20006,-(w/2-r),-(h/2-t)
+   k,20007,-(w/2-t),-(h/2-r)
+   k,20008,-(w/2-t),h/2-r
+   
+   ! Guide points for curves are the same, so we don't need to redefine them
+   
+   ! create straight lines
+   l,20001,20002 ! end - 7
+   l,20003,20004 ! end - 6
+   l,20005,20006 ! end - 5
+   l,20007,20008 ! end - 4
+   
+   ! create curved edges
+   larc,20002,20003,00010,r-t/2 ! end - 3
+   larc,20004,20005,00011,r-t/2 ! end - 2
+   larc,20006,20007,00012,r-t/2 ! end - 1
+   larc,20008,20001,00009,r-t/2 ! end - 0
+   
+   ! again get last defined and fill
+   *get,lmax,line,0,num,maxd
+   al,lmax,lmax-1,lmax-2,lmax-3,lmax-4,lmax-5,lmax-6,lmax-7
+   
+   ! We should now have three tubes of varying thicknesses. Now it is just a matter of performing repeated boolean operations to reduce the areas:
+   asba,1,3,,delete,keep ! creates area #4 since #1, #2, #3 defined THEN deletes area #1
+   asba,2,3,,delete,delete ! creates area #1 since #1 is now open THEN deletes areas #2 and #3
+   asba,4,1,,delete,keep ! creates area #2 since #2 is open THEN deletes area #4, but keeps area #1
+   
+   ! Now we are left with two areas: #2 (exterior) and #1 (interior).
+   ! Extrude them in their negative normal direction, which is for whatever reason against the z-direction (so extrude in the positive z-direction)
+   voffst,1,-d
+   voffst,2,-d
+   
+   ! Merge coincident elements (glue volumes together)
+   nummrg,kp,,,,low
+   numcmp,line
+   
+   ! View the whole structure:
+   view,iso
+   
+   ! Replace the end keypoints:
+   ! create interior "picture frame" again for the beams
+   k,30001,-(w/2-r),h/2-t/2,d
+   k,30002,w/2-r,h/2-t/2,d
+   k,30003,w/2-t/2,h/2-r,d
+   k,30004,w/2-t/2,-(h/2-r),d
+   k,30005,w/2-r,-(h/2-t/2),d
+   k,30006,-(w/2-r),-(h/2-t/2),d
+   k,30007,-(w/2-t/2),-(h/2-r),d
+   k,30008,-(w/2-t/2),h/2-r,d
+   
+   ! create guide points for curves
+   k,30009,-(w/2-r),h/2-r,d
+   k,30010,w/2-r,h/2-r,d
+   k,30011,w/2-r,-(h/2-r),d
+   k,30012,-(w/2-r),-(h/2-r),d
+   
+   ! create straight lines
+   l,30001,30002 ! end - 7
+   l,30003,30004 ! end - 6
+   l,30005,30006 ! end - 5
+   l,30007,30008 ! end - 4
+   
+   ! create curved edges
+   larc,30002,30003,30010,r-t/2 ! end - 3
+   larc,30004,30005,30011,r-t/2 ! end - 2
+   larc,30006,30007,30012,r-t/2 ! end - 1
+   larc,30008,30001,30009,r-t/2 ! end - 0
+   ! Set element types
+   et,1,187 ! need to switch to tetrahedral element due to 
+   !mopt,vmesh,alternate
+   esize,t/2 ! make the elements small enough to mesh
+   vmesh,all
+   
+   et,2,189 ! for beam ends
+   ! again get last defined
+   *get,lmax,line,0,num,maxd
+   ! only select last eight lines (rhs) and the original eight lines (lhs)
+   ! also by some dumb luck the original eight lines don't get reassigned when we compress all line numbers
+   lsel,s,line,,lmax-7,lmax
+   lsel,a,line,,lmaxO-7,lmaxO
+   
+   latt,,,2,,,,1
+   sectype,1,beam,rect
+   secdata,5, ! temporarily size beam
+   lmesh,all
+   /eshape,1
+   eplot
+*endif
+
+! voffst,4,d
+! view,iso
+
+! seltol,10e-8
+! lsel,s,loc,y,h/2 - t
+! lsel,a,loc,y,-h/2 + t
+! lsel,a,loc,x,w/2 - t
+! lsel,a,loc,x,-w/2 + t
+
+! *if,r,gt,0,then
+! lsel,a,radius,,r
+! lsel,u,length,,r
+! *endif
+
+! sfl,all,pres,pressure
+
+! lsel,all
+! esize,0.1
+	
+! ! mesh
+! et,1,183
+! amesh,all
+! sftran ! transfer area loads to element
+! time,1
+! lswrite,1
+
+! ! material
+! Et = 10000e3
+! Ec = 1*Et
+! nut = 0.3
+! nuc = 0.3
+
+! tb,user,1,1,4
+! tbtemp,0
+! tbdata,1,Et,Ec,nut,nuc
+! tb,state,1,,5
+
+! /PSF,PRES,NORM,2,0,1
+! eplot
+! /wait,1
+
+! /solu
+! antype,transient
+! mp,dens,1,0.079
+! nlgeom,on
+! nsubst,50
+! outres,all,all
+! outres,svar,all
+! autots,off
+! deltim,0.01
+! ncnv,0,0,0,300
+! lssolve,1,1,1
+
+! /post1
+! plesol,s,x ! x - radial direction
+
+! set,last
+! etable,method,svar,1
+! etable,torc,svar,2
+! etable,sI,svar,3
+! etable,E,svar,4
+! etable,nu,svar,5
+! pletab,sI,avg
+
+! r = 5
+! uy = UY(NODE(-w/2 + r, h/2,0))
+
+! *msg,ui,uy
+! UY: %g
+
+
+! ! case (1) : 1.027530915E-002
+! ! case (2) : 2.132968741E-002
+! ! case (3) : 7.837300

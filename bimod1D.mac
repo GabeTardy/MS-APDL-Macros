@@ -1,0 +1,94 @@
+rs
+
+h = 2
+b = 1
+iter = 1
+
+/pbc,all,,1 ! setup view options
+/psf,pres,norm,2,1,on ! Show pressures on model (normal)
+/psf,pres,tanx,2,1,on ! Show pressures on model (tanx)
+/psf,pres,tany,2,1,on ! Show pressures on model (tany)
+/eshape,1 ! show true cross-sections
+/number,0 ! Make colors represent materials and show the material number
+/pnum,mat,1
+/efacet,4 ! show more accurate shell plots with mid-nodes (technical: require apdl to plot 4 facets/edge)
+/dscale,all,auto
+
+!!- Discretize
+/prep7
+k,,0,0
+k,,24,0 ! 24" = 2'
+
+l,1,2
+!-!
+
+!!- Sec/Material
+Et = 25000e3 ! psi
+Ec = 30000e3 ! psi
+
+nut = 0.31 ! -in/in
+nuc = nut*Ec/Et ! see: ambartsumyan
+
+
+! set material properties
+mp,ex,1,Et
+mp,ex,2,Ec
+mp,prxy,1,nut
+mp,prxy,2,nuc
+
+! set element properties
+et,1,188
+
+! set section properties
+/seclib,read,'C:\Users\gjtardy42\Documents\Research Macros'
+sectype,1,beam,mesh
+secoffset,cent,,,
+secread,'bmtest','sect','Sections\',mesh
+secplot,1,4
+/wait,0.5
+
+lesize,all,1
+lmesh,all
+eplot
+
+view,side
+/eshape,1
+/replot
+/wait,0.5
+
+d,NODE(0,0,0),all,0
+f,NODE(8,0,0),fy,-1200 ! lb
+f,NODE(24,0,0),mz,4000 ! lb-in
+
+!-!
+
+/solu
+antype,static
+nlgeom,on
+nsubst,50
+time,1
+arclen,on,1
+autots,off
+outres,all,all
+solve
+
+/post1
+set,first
+
+/dscale,all,auto
+plesol,s,x,2,1
+! plesol,s,1,2,1
+qt = 'bimod_iter'
+fname = STRCAT(qt,CHRVAL(iter))
+
+*msg,ui,fname
+file name: %c
+
+/output,fname,'txt','Sections\'
+presol,s,comp
+
+*cfopen,'c','gjt','Sections\'
+*vwrite,'gjt:event_complete'
+%C
+*cfclos
+	

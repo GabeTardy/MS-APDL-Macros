@@ -1,0 +1,42 @@
+! setBimod.mac
+tolBimod = ARG2
+*if,tolBimod,eq,0,then
+	tolBimod = 10e-7
+*endif
+
+*if,ARG1,eq,0,then
+	tb,user,1,1,5
+	tbtemp,0
+	tbdata,1,Et,Ec,nut,nuc,0 ! 1 - Latorre and Montans (unfinished)
+	tb,state,1,,6
+*elseif,ARG1,eq,2,then
+	mp,ex,1,Et
+	mp,prxy,1,nuc
+*else
+	*if,Ec,gt,Et,then
+		Ea = Ec
+	*else	
+		Ea = Et
+	*endif
+	
+	mp,ex,1,Ea
+	mp,prxy,1,nuc
+	
+	tb,cast,1,1,1,isotropic
+	
+	tb,uniaxial,1,1,7,compression
+	tbtemp,0
+	tbpt,,0,0
+	*if,Ea,eq,Et,then
+		tbpt,,tolBimod,tolBimod*Ea
+	*endif
+	tbpt,,4,4*Ec
+	
+	tb,uniaxial,1,1,7,tension
+	tbtemp,0
+	tbpt,,0,0
+	*if,Ea,eq,Ec,then
+		tbpt,,tolBimod,tolBimod*Ea
+	*endif
+	tbpt,,4,4*Et
+*endif

@@ -1,0 +1,235 @@
+*if,ARG1,eq,0,then
+rs
+
+b = 20 ! base
+h = 10 ! height
+
+! ratio of hole radius to height/2:
+holeratio = 1/10
+r = holeratio*h/2
+
+! pressure
+tens = 10
+
+! element size
+elsize = 0.5
+
+! Display radius r
+*msg,ui,r
+Calculated radius: %g
+
+/prep7
+! Create big rectangle from points
+k,,-b/2,-h/2
+k,,-b/2,h/2
+k,,b/2,h/2
+k,,b/2,-h/2
+a,1,2,3,4
+
+! Create area for hole
+cyl4,0,0,r
+
+! Boolean-subtract hole (2) from rectangle (1)
+! Delete the original rectangle, but keep the hole so
+! that we can refine around it later
+! Note: area 3 is now the rectangle with a hole
+asba,1,2,,delete,keep
+
+! Assign material and element type
+et,1,183
+keyopt,1,3,5
+esize,elsize
+amesh,all ! Mesh everything (for now)
+
+! For technical FEA reasons, refine mesh around the hole (2)
+! three times, and extend 2 elements from the boundary of the hole
+arefine,2,,,3,2
+
+! Then fully delete the hole (2) from the elements:
+aclear,2
+
+! Apply pressure on left-hand side
+lsel,s,loc,x,-b/2 ! select all left lines
+sfl,all,pres,-tens
+
+lsel,s,loc,x,b/2 ! select all right lines
+sfl,all,pres,-tens
+lsel,all
+
+sftran ! transfer pressure to element-wise pressure :)
+/psf,pres,norm,2,0,1
+
+! Add a displacement boundary condition to prevent rigid-body motion
+!d,NODE(b/2,0,0),all
+
+! Set up for transient analysis
+time,1
+lswrite,1
+
+eplot
+/wait,1
+
+! set up material
+Et = 5*10000e3
+Ec = 1*Et
+nut = 0.3
+nuc = 0.3
+
+! mp,ex,1,10000e3
+! mp,prxy,1,nuc !0.3
+
+tb,user,1,1,4
+tbtemp,0
+tbdata,1,Et,Ec,nut,nuc
+tb,state,1,,5
+
+! mp,ex,1,Ec
+! mp,prxy,1,nuc
+! tb,cast,1,1,1,isotropic
+! tb,uniaxial,1,1,7,compression
+! tbtemp,0
+! tbpt,,0,0
+! tbpt,,10e-7,10e-7*Ec
+! tbpt,,0.1,0.1*Ec
+! tbpt,,1,Ec
+! tbpt,,2,2*Ec
+! tbpt,,3,3*Ec
+! tbpt,,4,4*Ec
+! tb,uniaxial,1,1,7,tension
+! tbtemp,0
+! tbpt,,0,0
+! tbpt,,10e-7,10e-7*Ec
+! tbpt,,0.1,0.1*Et
+! tbpt,,1,Et
+! tbpt,,2,2*Et
+! tbpt,,3,3*Et
+! tbpt,,4,4*Et
+
+mp,dens,1,0.079
+
+! solve
+/solu
+antype,transient
+nlgeom,on
+nsubst,50
+outres,all,all
+outres,svar,all
+autots,off
+deltim,0.01
+ncnv,0,0,0,300
+lssolve,1,1,1
+
+/post1
+set,last
+pldisp,0
+
+/contour,all,256
+/edge,1,0,45
+/gline,1,-1
+! rsys,1
+plesol,s,x ! x - radial direction
+
+set,last
+
+*endif
+rsys,0
+
+! create a path across the center
+path,cent,2,7,100 ! (6 - x, y, z, s[unused], sx, sy; 100 - 100 divisions)
+ppath,1,,0,h/2 ! defined by h/2, -h/2 @ 0
+ppath,2,,0,-h/2
+
+! operate the stress(x) value into the path (without averaging)
+pdef,sx,s,x,noav
+
+! operate the stress(y) value into the path (without averaging)
+pdef,sy,s,y,noav
+
+! determine stress(I) value by adding stress(x) + stress(y)
+pcalc,add,sI,sx,sy
+
+! plot the stresses (sx, sy, sI) with respect to path length (s)
+plpath,sx,sy,sI
+!/wait,1
+
+! plot the stress in the x-direction on the line
+plpagm,sx,25
+
+*cfopen,rhs,csv
+*vwrite,'y','sx','sy','sI'
+%C,%C,%C,%C
+
+*do,p,1,100
+	*get,yg,path,,item,yg,pathpt,p
+	*get,sx,path,,item,sx,pathpt,p
+	*get,sy,path,,item,sy,pathpt,p
+	*get,sI,path,,item,sI,pathpt,p
+	
+	*vwrite,yg,sx,sy,sI
+%g,%g,%g,%g
+*enddo
+*cfclos
+
+! create a horizontal path across the center
+path,cent1,2,7,100 ! (6 - x, y, z, s[unused], sx, sy; 100 - 100 divisions)
+ppath,1,,-b/2,0 ! defined by h/2, -h/2 @ 0
+ppath,2,,b/2,0
+rsys,1
+! operate the stress(x) value into the path (without averaging)
+pdef,sx,s,x,noav
+
+! operate the stress(y) value into the path (without averaging)
+pdef,sy,s,y,noav
+
+! determine stress(I) value by adding stress(x) + stress(y)
+pcalc,add,sI,sx,sy
+
+! plot the stresses (sx, sy, sI) with respect to path length (s)
+plpath,sx,sy,sI
+
+plpagm,sy,25
+
+! create a path at the hole
+path,hole,128+1,7,100
+*do,i,1,128+1
+	ppath,i,,r*cos((i-1)/128*2*Pi),r*sin((i-1)/128*2*Pi)
+*enddo
+
+! change the coordinate system to radial
+rsys,1
+
+! operate the stress(r) value into the path (without averaging)
+pdef,sr,s,x,noav
+
+! operate the stress(t) value into the path (without averaging)
+pdef,st,s,y,noav
+
+! determine stress(I) value by adding stress(r) + stress(t)
+pcalc,add,sI,sr,st
+
+! plot the stresses (sx, sy, sI) with respect to path length (s)
+plpath,sr,st
+!/wait,1
+
+! plot sI along the hole
+plpagm,sI
+
+! write all the sI values to an array (with x, y, s)
+paget,holepts,points
+paget,holevals,table
+
+! mask out specific values
+
+!*cfopen,'rh','csv'
+!*vwrite,holevals(1)
+!%G,%G,%G,%G,%G,%G,%G
+!*cfclos
+*mwrite,holevals,'rh','csv'
+%G,%G,%G,%G,%G,%G,%G
+
+rsys,1
+set,last
+etable,s1,s,x
+etable,s2,s,y
+sadd,sI,s1,s2
+pletab,sI ! sI - first invariant

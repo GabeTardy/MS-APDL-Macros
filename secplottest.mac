@@ -1,0 +1,7 @@
+! secplottest
+/prep7
+/seclib,read,'C:\Users\gjtardy42\Documents\Research Macros'
+sectype,1,beam,mesh
+secoffset,cent,,,
+secread,'bmtest','sect','Sections\',mesh
+secplot,1,4

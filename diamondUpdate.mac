@@ -1,0 +1,120 @@
+! diamond.mac
+
+rs
+
+ar = 7 ! aspect ratio
+thkr = 5 ! thickness ratio
+spr = 10000 ! spring to material elasticity ratio
+
+load = 1
+
+/prep7
+!k,,0,0
+!k,,1/(2*ar),1/2
+!k,,-1/(2*ar),1/2
+!k,,0,1
+
+!l,1,2
+!l,2,4
+!l,1,3
+!l,3,4
+
+!l,2,3
+
+k,,0,0  
+k,,2,0  
+k,,0,2  
+k,,2,2  
+k,,0.5,1
+k,,1.5,1
+l,1,5   
+l,5,3   
+l,3,4   
+l,4,6   
+l,6,2   
+l,1,2 
+
+mp,ex,1,spr
+mp,prxy,1,0.1
+mp,ex,2,10000
+mp,prxy,1,0.1
+
+et,1,189
+sectype,1,beam,rect
+secdata,1/thkr,1/thkr
+!lesize,all,0.01
+lesize,all,1
+lmesh,all
+/eshape,1 ! show true cross-sections
+/pnum,mat,1
+
+!mpchg,2,5 ! change to spring material
+eplot
+
+d,node(0,0,0),all,0
+d,node(2,0,0),uy,0
+
+!d,node(0,0,0),ux,0
+!d,node(2,0,0),ux,0
+
+/prep7
+f,node(0,2,0),fy,load
+f,node(2,2,0),fy,load
+!f,node(0.5,1,0),fx,-load
+!f,node(1.5,1,0),fx,load
+eplot
+
+/solu
+antype,static
+outres,all,all
+ANTYPE,0
+NLGEOM,1
+ARCLEN,1,0,0
+AUTOTS,-1.0 
+solve
+
+/post1
+set,first
+pldisp,1
+
+strainYt = (UY(NODE(0,2,0)) + UY(NODE(2,2,0)))/2
+stressYt = load/((1/thkr)*(1/thkr)) ! not sure what this is supposed to be based on so i made it the force divided by the area of just one of these elements?
+EYt = stressYt/strainYt
+
+
+/prep7
+f,node(0,2,0),fy,-load
+f,node(2,2,0),fy,-load
+!f,node(0.5,1,0),fx,load
+!f,node(1.5,1,0),fx,-load
+
+!d,NODE(0,0,0),all,0
+!f,NODE(0,1,0),fy,-load
+
+/solu
+antype,static
+outres,all,all
+ANTYPE,0
+NLGEOM,1
+ARCLEN,1,0,0
+AUTOTS,-1.0 
+solve
+
+/post1
+set,first
+pldisp,1 
+
+strainYc = (UY(NODE(0,2,0)) + UY(NODE(2,2,0)))/2
+stressYc = -load/((1/thkr)*(1/thkr)) ! not sure what this is supposed to be based on so i made it the force divided by the area of just one of these elements?
+EYc = stressYc/strainYc
+
+
+
+M = Eyc/Eyt
+
+/DSCALE,ALL,1.0 
+/EFACET,1   
+PLNSOL, S,X, 0,1.0 
+
+*msg,ui,EYc,stressYc,strainYc,Eyt,stressYt,strainYt,M
+Youngs Modulus (Compression): %g%/-- based on (%g/%g)%/Youngs Modulus (Tension): %g%/-- based on (%g/%g)%/Modular Ratio: %g

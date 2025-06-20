@@ -1,0 +1,13 @@
+finish
+/clear
+/psearch,'C:\Users\gjtardy42\OneDrive - Tennessee Tech University\MS - Research\Code\Ansys'
+/replot
+/cmap,'test','cmap'
+
+! option constants
+! these constants have been set up to ease querying and "having to remember things"
+side = 420
+iso = 421
+snap = 422
+
+pi = 3.1415926535

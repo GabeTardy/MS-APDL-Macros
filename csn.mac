@@ -1,0 +1,231 @@
+w = ARG1
+h = ARG2
+cw = ARG3
+ch = ARG4
+! cell indent
+ck = ARG5
+! cell curvature
+cb = ARG6
+! cell edge divisions
+cd = ARG7
+! ARG8: 0 - y, 1 - z
+isY = 1 - ARG8
+isZ = ARG8 
+! ARG9: Symmetry: -1: symmetric, 1: all in same dir
+symm = ARG9
+
+pi = 3.1415926535
+
+/prep7
+! get next highest keypoint number
+*get,skp,kp,,num,maxd
+*get,skpL,line,,num,maxd
+
+skp = skp + 1
+skpL = skpL + 1
+
+! number of new keypoints per iteration
+nkp = 4
+
+! create top/bottom curves
+*do,i,0,cd-1,1
+	kpx = cw*i/(2*cd)
+	kpy = cb*ch*sin(pi*kpx/cw)
+	
+	! bottom
+	k,skp+i*nkp+0,kpx,kpy*isY,kpy*isZ
+	k,skp+i*nkp+1,cw - kpx,kpy*isY,kpy*isZ
+	
+	! top
+	k,skp+i*nkp+2,kpx,symm*kpy*isY+ch,symm*kpy*isZ
+	k,skp+i*nkp+3,cw - kpx,symm*kpy*isY+ch,symm*kpy*isZ
+	
+	! make lines from new to old keypoints 
+	! (if there are old keypoints)
+	*if,i,gt,0,then
+		! bottom
+		l,skp+i*nkp+0,skp+(i-1)*nkp+0
+		l,skp+i*nkp+1,skp+(i-1)*nkp+1
+
+		! top
+		l,skp+i*nkp+2,skp+(i-1)*nkp+2
+		l,skp+i*nkp+3,skp+(i-1)*nkp+3
+	*endif
+	
+	! create middle keypoints
+	*if,i,eq,cd-1,then
+		! bottom
+		k,skp+cd*nkp+0,cw/2,cb*ch*isY,cb*ch*isZ
+		l,skp+cd*nkp+0,skp+i*nkp+0
+		l,skp+cd*nkp+0,skp+i*nkp+1
+		
+		! top
+		k,skp+cd*nkp+1,cw/2,(1+symm*cb*isY)*ch,symm*cb*ch*isZ
+		l,skp+cd*nkp+1,skp+i*nkp+2
+		l,skp+cd*nkp+1,skp+i*nkp+3
+	*endif
+*enddo
+
+! all endpoints are on the first iteration
+! therefore:
+! left
+k,skp+cd*nkp+2,ck*cw,ch/2
+l,skp+0,skp+cd*nkp+2
+l,skp+2,skp+cd*nkp+2
+
+! right
+k,skp+cd*nkp+3,(1-ck)*cw,ch/2
+l,skp+1,skp+cd*nkp+3
+l,skp+3,skp+cd*nkp+3
+
+! single cell created. now copy and glue this pattern:
+lLow = skpL
+*get,lHighCell,line,,num,maxd
+
+! Determine number of copies to create this round
+! (See derivation on pdf)
+nCopiesX = nint((w-cw)/(2*cw*(1-ck)))
+nCopiesY = nint(h/ch)
+
+! Make copies in x direction
+lgen,nCopiesX,lLow,lHighCell,,2*cw*(1-ck),0,0,0
+! get new max line number
+*get,lHighRow,line,,num,maxd
+
+! Make copies in y direction
+*if,symm,eq,-1,then
+	lgen,nint(nCopiesY/2),lLow,lHighRow,,0,ch*2,0,0
+*else
+	lgen,nCopiesY,lLow,lHighRow,,0,ch,0,0
+*endif
+
+! Place intermediate (interior) cells.
+! Start by placing a single template intermediate cell
+*get,lLowCellInt,line,,num,maxd
+lLowCellInt = lLowCellInt + 1
+lgen,2,lLow,lHighCell,,cw*(1-ck),ch/2,0,0
+*get,lHighCellInt,line,,num,maxd
+
+! Make intermediate copies in x direction
+lgen,nCopiesX-1,lLowCellInt,lHighCellInt,,2*cw*(1-ck),0,0,0
+! get new max line number
+*get,lHighRowInt,line,,num,maxd
+
+! Make intermediate copies in y direction
+*if,symm,eq,-1,then
+	lgen,nCopiesY/2 - 0.5,lLowCellInt,lHighRowInt,,0,ch*2,0,0
+*else
+	lgen,nCopiesY-1,lLowCellInt,lHighRowInt,,0,ch,0,0
+*endif
+
+! If nCopiesY is even, then the last cell on the top needs to be recreated before the boundary is created
+! If nCopiesY is odd, then the last interior cell on the top needs to be recreated, which can happen anytime.
+*if,nint(nCopiesY/2)-nCopiesY/2,eq,0,then
+	*get,skp,kp,,num,maxd
+	*get,skpL,line,,num,maxd
+	skp = skp + 1
+	skpL = skpL + 1
+	nkp = 2 ! only two keypoints are being created now
+	
+	*do,i,0,cd-1,1
+		kpx = cw*i/(2*cd)
+		kpy = cb*ch*sin(pi*kpx/cw)
+		
+		! bottom
+		k,skp+i*nkp+0,kpx,kpy*isY + ch*(nCopiesY),kpy*isZ
+		k,skp+i*nkp+1,cw - kpx,kpy*isY + ch*(nCopiesY),kpy*isZ
+		
+		! make lines from new to old keypoints 
+		! (if there are old keypoints)
+		*if,i,gt,0,then
+			! bottom
+			l,skp+i*nkp+0,skp+(i-1)*nkp+0
+			l,skp+i*nkp+1,skp+(i-1)*nkp+1
+		*endif
+		
+		! create middle keypoints
+		*if,i,eq,cd-1,then			
+			! bottom
+			k,skp+cd*nkp+0,cw/2,cb*ch*isY + ch*(nCopiesY),cb*ch*isZ
+			l,skp+cd*nkp+0,skp+i*nkp+0
+			l,skp+cd*nkp+0,skp+i*nkp+1
+		*endif
+	*enddo
+	
+	*get,skpL2,line,,num,maxd
+	lgen,nCopiesX,skpL,skpL2,,2*cw*(1-ck),0,0,0
+	
+	eo = 1 ! even
+*else
+	*get,skp,kp,,num,maxd
+	*get,skpL,line,,num,maxd
+	skp = skp + 1
+	skpL = skpL + 1
+	nkp = 2 ! only two keypoints are being created now
+	
+	*do,i,0,cd-1,1
+		kpx = cw*i/(2*cd)
+		kpy = cb*ch*sin(pi*kpx/cw)
+		
+		! bottom
+		k,skp+i*nkp+0,kpx + cw*(1-ck),kpy*isY + ch*(nCopiesY - 1/2),kpy*isZ
+		k,skp+i*nkp+1,cw - kpx + cw*(1-ck),kpy*isY + ch*(nCopiesY - 1/2),kpy*isZ
+		
+		! make lines from new to old keypoints 
+		! (if there are old keypoints)
+		*if,i,gt,0,then
+			! bottom
+			l,skp+i*nkp+0,skp+(i-1)*nkp+0
+			l,skp+i*nkp+1,skp+(i-1)*nkp+1
+		*endif
+		
+		! create middle keypoints
+		*if,i,eq,cd-1,then			
+			! bottom
+			k,skp+cd*nkp+0,cw/2 + cw*(1-ck),cb*ch*isY + ch*(nCopiesY - 1/2),cb*ch*isZ
+			l,skp+cd*nkp+0,skp+i*nkp+0
+			l,skp+cd*nkp+0,skp+i*nkp+1
+		*endif
+	*enddo
+	
+	*get,skpL2,line,,num,maxd
+	lgen,nCopiesX-1,skpL,skpL2,,2*cw*(1-ck),0,0,0
+	
+	eo = 0 ! odd
+*endif
+
+! Create boundary
+*do,i,1,nCopiesX-1,1
+	l,KP(cw + (i-1)*(2*cw - 2*ck*cw),0,0),KP(2*cw - 2*ck*cw + (i-1)*(2*cw - 2*ck*cw), 0, 0) 
+	l,KP(cw + (i-1)*(2*cw - 2*ck*cw),ch*nCopiesY,0),KP(2*cw - 2*ck*cw + (i-1)*(2*cw - 2*ck*cw), ch*nCopiesY, 0)
+*enddo
+
+*if,symm,eq,-1,then
+	! Recreate missing cells on edges
+	*do,i,1,nint(nCopiesY/2)-1+eo
+		! Left side
+		k,,cw*ck,ch*(2*i-1) + ch/2
+		*get,lastKP,kp,,num,maxd
+		l,KP(0,ch*(2*i-1),0),lastKP
+		l,KP(0,ch*(2*i),0),lastKP
+		
+		! Right side
+		k,,2*cw*(1-ck)*(nCopiesX-1) + cw - cw*ck,ch*(2*i-1) + ch/2
+		*get,lastKP,kp,,num,maxd
+		l,KP(2*cw*(1-ck)*(nCopiesX-1) + cw,ch*(2*i-1),0),lastKP
+		l,KP(2*cw*(1-ck)*(nCopiesX-1) + cw,ch*(2*i),0),lastKP
+		
+		! interior
+		*do,j,1,nCopiesX - 1
+			l,KP(cw*(1-ck)*(2*j-1),ch*(2*i-1) + ch/2,0),KP(cw*(2*j-1) - 2*cw*ck*(j-1),ch*(2*i),0)
+			l,KP(cw*(1-ck)*(2*j-1)+cw,ch*(2*i-1) + ch/2,0),KP(cw*(2*j-1) - 2*cw*ck*(j-2),ch*(2*i),0)
+		*enddo
+	*enddo
+*endif
+
+! Merge coincident items
+nummrg,kp,,,,low
+
+! "Return" the extents of the metamaterial
+csnMaxX = 2*cw*(1-ck)*(nCopiesX-1) + cw
+csnMaxY = ch*(nCopiesY + cb) 

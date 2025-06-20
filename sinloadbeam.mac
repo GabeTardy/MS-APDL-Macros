@@ -1,0 +1,47 @@
+loadMagnitude = ARG1
+guessedLength = ARG2
+loadDirection = ARG3 ! 0 - Vertical direction is Z direction; 1 - Vertical direction is Y direction
+
+fv = loadDirection + 1 ! 1 -z direction, 2 +y direction
+fh = 3 ! 3 +x direction
+
+! get maximum length (may not be real length based on integer number of cells)
+kpx = KP(guessedLength,0,0)
+actualLength = KX(kpx)
+
+pi=3.14159265359
+
+*get,numl,elem,,count
+i = 0
+*do,kCounter,1,numl
+	
+	i = ELNEXT(i)
+	
+	! get start and end node numbers
+	n1 = NELEM(i,1)
+	n2 = NELEM(i,2)
+	
+	! get x- and z-position of each node
+	n1x = NX(n1)
+	n1z = NZ(n1)
+	
+	n2x = NX(n2)
+	n2z = NZ(n2)
+	
+	! angle
+	*if,n2x,eq,n1x,then
+		ang = 0
+	*else
+		ang = atan((n2z-n1z)/(n2x-n1x))
+	*endif
+	
+	q1 = loadMagnitude*sin(pi*n1x/actualLength)
+	q2 = loadMagnitude*sin(pi*n2x/actualLength)
+	
+	! make a surface load on the line interpolating linearly between f of the two keypoints' x positions
+	sfbeam,i,fv,pres,q1*cos(ang),q2*cos(ang)
+	sfbeam,i,fh,pres,-q1*sin(ang),-q2*sin(ang)
+	
+	! 1: -z direction
+	! 3: +x direction
+*enddo

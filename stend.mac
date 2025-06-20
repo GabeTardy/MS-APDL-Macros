@@ -1,0 +1,14 @@
+*cfopen,'geom2DT','csv'
+*vwrite,'a0','E','I','L','n','p','A','t0'
+%C,%C,%C,%C,%C,%C,%C,%C
+*vwrite,a0,E,Izz,L,n,omega,Ar,t0
+%G,%G,%G,%G,%G,%G,%G,%G
+*cfclos
+
+*cfopen,'results2DT','csv'
+*vwrite,'t','uz'
+%C,%C
+
+*vwrite,time(1),dispy(1) 
+%G,%G 
+*cfclos

@@ -1,0 +1,92 @@
+rs
+! confirm behavior of pressure command
+! plate v2
+
+elementSize = 4 !4
+
+! create 96x48 area
+/prep7
+k,,-24,-48
+k,,-24, 48
+k,, 24, 48
+k,, 24,-48
+
+l,1,2
+l,2,3
+l,3,4
+l,4,1
+
+al,1,2,3,4
+
+! material
+mp,ex,1,29000e3
+mp,prxy,1,0.32
+
+et,1,281
+sectype,1,shell
+secdata,0.0187,1,0.0,3
+secoffset,mid
+aesize,all,elementSize
+amesh,all
+
+lsel,s,line,,2
+lsel,a,line,,4
+
+et,2,189
+sectype,2,beam,rect
+latt,,,,,,,2
+secdata,0.594900637,1.18980127
+lesize,all,elementSize
+lmesh,all
+/eshape,1
+eplot
+
+! constrain edges
+/solu
+
+nsel,s,loc,x,24
+d,all,ux,-0.4
+
+nsel,s,loc,x,-24
+d,all,ux,0
+
+nsel,a,loc,x,24
+d,all,uy,0
+d,all,uz,0
+
+nsel,s,loc,y,48
+nsel,a,loc,y,-48
+d,all,rotx,0
+
+nsel,all
+
+! apply pressure
+esel,s,type,,1
+sfe,all,1,pres,,-10*62.4/(12**3)
+esel,all
+
+esel,all
+nsel,all
+lsel,all
+asel,all
+
+/prep7
+nummrg,node
+nummrg,elem
+
+/solu
+antype,static
+outres,all,all
+nlgeom,on
+!autots,on ! this might break it
+nsubst,1000,5000,1000
+ncnv,0,1.0e15
+!arclen,on,10,1/10000
+solve
+
+/dscale,all,1 !0
+/post1
+set,last
+!pldisp,0
+view,iso
+plns,u,z

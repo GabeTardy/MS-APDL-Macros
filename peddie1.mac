@@ -1,0 +1,146 @@
+! Peddie1.mac
+! Creates a plane stress beam and applies a moment to a side
+
+rs
+/PSF,PRES,NORM,2,0,1
+/PBC,ALL, ,1
+/PSYMB,DOT,1
+
+moment = 1
+n = 5
+Et = 10000e3
+Ec = n*Et
+nut = 0 !0.3
+nuc = 0 !0.3
+
+L = 5
+h = 1
+hc = h*sqrt(Ec)/(sqrt(Et) + sqrt(Ec)) ! compressive zone height (idk)
+ht = h - hc ! tensile zone height (idk)
+!h2 = h/(sqrt(n) + 1) ! compression zone height
+!h1 = h*sqrt(n)/(sqrt(n) + 1)! tensile zone height
+
+elsize = 0.025
+
+! set up area
+/prep7
+k,,-L,-ht
+k,,0,-ht
+k,,0,0
+k,,-L,0
+k,,-L,hc
+k,,0,hc
+a,1,2,3,4
+a,4,3,6,5
+
+! set material = usermat
+setbimod,0
+
+! make into shell
+et,1,183
+
+! for whatever reason the element size is directly related to convergence of this model. 0.25 is the smallest size that works (confirm this?)
+aesize,all,elsize
+amesh,all
+
+! set displacement bc
+/solu
+! Pin-roller (SS)
+!d,NODE(-L,0,0),ux,0,,,,uy,rotx
+d,NODE(0,0,0),all
+
+! had some weird issues selecting these elements so this should fix that
+! /post1
+! path,rhs,2,7,100
+! ppath,1,,-elsize/2,-ht
+! ppath,2,,-elsize/2,hc
+! esel,s,path,rhs
+
+! /solu
+! d,all,all
+! esel,all
+
+! whatever....
+!d,NODE(0,0,0),all
+!d,NODE(0,-ht,0),all
+!d,NODE(0,hc,0),all
+nsel,s,loc,x,0
+d,all,all
+nsel,all
+
+! set force bc on load key 4 (left side)
+esel,s,cent,x,-L,-L+elsize
+currentEl = 0
+*do,i,1,100000 ! effectively infinity
+   currentEl = ELNEXT(currentEl)
+   *if,ESEL(currentEl),eq,1,then
+      ! get y position of left nodes
+      yLower = NY(NELEM(currentEl,1))
+      yUpper = NY(NELEM(currentEl,4))
+      sfe,currentEl,4,pres, ,moment*(-ht + h/2 - yLower),moment*(-ht + h/2 - yUpper)
+   *endif
+   
+   *if,currentEl,eq,0,then
+      *exit ! end do loop
+   *endif
+*enddo
+
+time,1
+lswrite,1
+
+! esel,all
+! /pbc,all,,on
+! eplot
+! /wait,1
+
+! /solu
+! antype,transient
+! nlgeom,on
+! nsubst,50
+! outres,all,all
+! outres,svar,all
+! autots,off
+! deltim,0.01
+! ncnv,0,0,0,300
+! lssolve,1,1,1
+
+! /post1
+! /eshape,1
+! !view,iso
+! /dscale,all,1
+! set,last
+! !plnsol,s,x,0,1
+! !plnsol,u,x,0,1
+! !/wait,5
+
+! plnsol,u,y,0,1
+
+! set,last
+! etable,method,svar,1
+! etable,torc,svar,2
+! etable,sI,svar,3
+! etable,E,svar,4
+! etable,nu,svar,5
+! pletab,sI,avg
+! pletab,torc,avg
+
+! ! ! take midplane, top, and bottom sigma__xx and export them to a csv file
+! ! *cfopen,'chp','csv'
+! ! *vwrite,'x','sxx+(-h1)','sxx-(+h2)','sxx0(0)'
+! ! %C,%C,%C,%C
+! ! *do,ii,-L,L,elsize
+	! ! ! get bottom stress
+	! ! *get,sxtii,node,NODE(ii,-h1,0),s,x
+	
+	! ! ! get top stress
+	! ! *get,sxcii,node,NODE(ii,h2,0),s,x
+	
+	! ! ! get neutral axis stress
+	! ! *get,sx0ii,node,NODE(ii,0,0),s,x
+
+	! ! ! write to file
+	! ! *vwrite,ii,sxtii,sxcii,sx0ii
+! ! %G,%G,%G,%G
+! ! *enddo
+
+! ! *cfclos

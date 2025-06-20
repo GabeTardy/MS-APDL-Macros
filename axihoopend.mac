@@ -1,0 +1,16 @@
+! axihoopend.mac
+
+set,last
+
+*cfopen,'axihoop','csv'
+*vwrite,'r','srr'
+%C,%C
+*do,ii,rinner,router,(router-rinner)/ndiv
+	! get radial stress at this point
+	*get,sxtii,node,NODE(-ii,0,0),s,x
+
+	! write to file
+	*vwrite,ii,sxtii
+%G,%G
+*enddo
+*cfclos

@@ -1,0 +1,256 @@
+! Configurable Sinusoidal Snapthrough - Shell Elements
+! Written by Gabriel Tardy
+! Arguments:
+! ARG1:
+!	- 0: Static (default)
+!	- 1: Modal+transient
+! ARG2:
+!	- 0: Load+Pull (single-cycle) (default)
+!	- 1: Load+Load (double-cycle)
+
+!!- Setup
+rs ! clearing macro
+/rep ! replot screen
+/pbc,all,,1 ! setup view options
+/psf,pres,norm,2,1,on ! Show pressures on model (normal)
+/psf,pres,tanx,2,1,on ! Show pressures on model (tanx)
+/psf,pres,tany,2,1,on ! Show pressures on model (tany)
+/eshape,1 ! show true cross-sections
+/number,0 ! Make colors represent materials and show the material number
+/pnum,mat,1
+/efacet,4 ! show more accurate shell plots with mid-nodes (technical: require apdl to plot 4 facets/edge)
+view,iso ! Show isometric view
+/prep7
+!-!
+
+!!- Inputs
+m = 1/3
+n = 2
+lambda = 1/50 
+a0 = 1
+zeta = 1/3
+tau = 150
+
+k = 120*7/tau ! iteration resolution constant. higher = better resolution, longer time taken to simulate
+fps = 60
+
+Ex = 10000e3 ! psi
+prxy = 0.0 
+rho = 0.0975
+
+pi = 3.1415926535
+
+! Dimensioning
+l = a0/lambda
+ndiv = l
+h = a0*(3*m)**(0.5)
+b = 0.2*l ! depth of shell in z-dir
+Izz = b*(h**3)/12
+Ar = b*h
+q0 = n*Ex*Izz*a0*(pi/l)**4
+!-!
+
+!!- Element Model
+et,1,281 ! SHELL281
+sectype,1,shell,,sandwich ! Set up a sandwich composite (able to be edited with layers)
+secdata,h,1,0,3
+!-!
+
+!!- Material Model
+mp,ex,1,Ex
+mp,prxy,1,prxy
+mp,dens,1,rho
+!-!
+
+!!- Physical Model
+seltol,0.001 ! setup selection tolerance (used later for constraints)
+
+sinarc,l,ndiv,a0 ! setup sine arc, l long, with ndiv divisions, and a0 high.
+
+! show progress
+lplot
+/replot
+/wait,0.5
+
+! create four keypoints at quarter points and connect lines
+k,,0,0,b/4
+k,,0,0,b/2
+k,,0,0,3*b/4
+k,,0,0,b
+l,1,KP(0,0,b/4)
+l,KP(0,0,b/4),KP(0,0,b/2)
+l,KP(0,0,b/2),KP(0,0,3*b/4)
+l,KP(0,0,3*b/4),KP(0,0,b)
+/replot
+/wait,0.5
+
+*get,nl,line,,num,maxd
+adrag,all,,,,,,nl-3,nl-2,nl-1,nl ! extrude along the last four lines created
+!-!
+
+!!- Meshing
+aesize,all,1000
+amesh,all
+eplot
+/replot
+/wait,0.5
+!-!
+
+!!- Apply Pin-Pin Boundary Conditions
+nsel,s,loc,x,0
+nsel,a,loc,x,l
+d,all,ux,0,,,,uy,uz,rotx,roty
+nsel,all
+!-!
+
+!!- Perform Analyses
+*if,ARG1,eq,1,then ! (modal+)transient analysis
+	/solu
+	antype,modal
+	mxpand,0,,,0
+	lumpm,0
+	pstres,0
+	modopt,lanb,5,0,0,,off
+	solve
+
+	*get,firstModeFreq,mode,1,freq
+
+	dt = 1/(k*firstModeFreq)
+
+	omega_ = firstModeFreq*2*pi
+	massDamping_ = zeta*omega_
+	t0_ = tau/omega_
+
+	! Step 7: solve, dynamic (get dynamic response)
+	eplot 
+	/replot
+
+	*msg,ui,omega_,massDamping_,t0_,dt
+	Omega: %g, Alpha: %g, t0: %g, dt: %g
+
+	*msg,ui,3*t0_
+	Total Expected TIME: %g
+
+	finish
+	/solu
+	antype,transient
+	nlgeom,1
+	deltim,dt
+	alphad,massDamping_
+	betad,0
+	kbc,0
+	lumpm,0
+	outres,all,all
+
+	*if,ARG2,eq,0,then
+		! Place Load Steps
+		sinloadshell,q0/b,l
+		time,1*t0_
+		lswrite,1
+		/wait,0.5
+
+		sinloadshell,-q0/2/b,l
+		time,5/2*t0_
+		lswrite,2
+
+		sinloadshell,0,l
+		time,3*t0_
+		lswrite,3
+
+		! Solve
+		lssolve,1,3,1
+	*else
+		! Place Load Steps
+		sinloadshell,q0/b,l
+		time,1*t0_
+		lswrite,1
+		/wait,0.5
+
+		sinloadshell,0,l
+		time,2*t0_
+		lswrite,2
+
+		sinloadshell,q0/b,l
+		time,3*t0_
+		lswrite,3
+
+		sinloadshell,0,l
+		time,4*t0_
+		lswrite,4
+
+		! Solve
+		lssolve,1,4,1
+	*endif
+*else
+	! Place Load
+	sinloadshell,q0/b,l
+	/wait,0.5
+	
+	/solu
+	antype,static
+	nlgeom,on
+	nsubst,50
+	time,1
+	arclen,on,1
+	autots,off
+	outres,all,all
+	solve
+*endif
+!-!
+
+!!- Plot Results
+/post1
+set,first
+view,iso
+
+! to show contour plot of displacement
+/dscale,all,auto
+plnsol,u,y,0,1
+/wait,5
+!-!
+
+!!- Plot Displacement Graph
+/post26
+nsol,2,NODE(l/2,a0,b/2),u,y,UY ! load the nodal displacement solution at the center of the arch to time-hist variable 2
+plvar,2
+/wait,5
+!-!
+
+!!- Export Results to Nondimensionalizer
+vget,time,1 
+vget,dispy,2
+
+*if,ARG1,eq,1,then
+	*cfopen,'geom3DT','csv'
+	*vwrite,'a0','E','I','L','n','p','A','t0'
+%C,%C,%C,%C,%C,%C,%C,%C
+	*vwrite,a0,ExForLoad,Izz,l,n,omega_,b*h,t0_
+%G,%G,%G,%G,%G,%G,%G,%G
+	*cfclos
+
+	*cfopen,'results3DT','csv'
+	*vwrite,'t','uz'
+%C,%C
+*else
+	*cfopen,'geom3D','csv'
+	*vwrite,'a0','E','I','L','q0','m','n'
+%C,%C,%C,%C,%C,%C,%C
+	*vwrite,a0,Ex,Izz,l,q0,m,n
+%G,%G,%G,%G,%G,%G,%G
+	*cfclos
+
+	*cfopen,'results3D','csv'
+	*vwrite,'P','uz'
+%C,%C
+*endif
+
+*vwrite,time(1),dispy(1) 
+%G,%G 
+*cfclos
+!-!
+
+*if,ARG3,eq,1,then
+snapanim,ARG2
+*endif
+
+*status,PRM_

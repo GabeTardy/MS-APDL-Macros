@@ -1,0 +1,179 @@
+! Step 0: setup
+rs ! clearing macro
+/rep ! replot screen
+/pbc,all,,1 ! setup view options
+/psf,pres,norm,2,0,1 ! setup view options
+
+!--------------------------------------------------------------------------
+! Inputs
+m = 1/4
+n = 3
+lambda = 1/50 
+a0 = 1
+k = 20 ! iteration resolution constant. higher = better resolution, longer time taken to simulate
+zeta = 1/3
+tau = 150
+fps = 60
+
+Ex = 10000e3 ! psi
+prxy = 0.0 
+rho = 0.0975
+pi = 3.1415926535
+
+! dimension calculations
+l = a0/lambda
+ndiv = l*2
+h = a0*(3*m)**(0.5) 
+b = 0.2*l
+
+! moment of inertia, cross-sectional area, and required load
+Izz = b*(h**3)/12 
+Ar = b*h
+q0 = n*Ex*Izz*a0*(pi/l)**4
+
+!--------------------------------------------------------------------------
+
+seltol,0.001 ! setup selection tolerance (used later for constraints)
+/eshape,1 ! view sections
+
+! Step 1: generate geometry
+sinarc,l,ndiv,a0 ! setup sine arc, 30u long, 120 divisions (60x2), and 1u high.
+
+! create four keypoints at quarter points
+depthDivs = 4 ! for later, this is a wip
+k,,0,0,b/4
+k,,0,0,b/2
+k,,0,0,3*b/4
+k,,0,0,b
+l,1,KP(0,0,b/4)
+l,KP(0,0,b/4),KP(0,0,b/2)
+l,KP(0,0,b/2),KP(0,0,3*b/4)
+l,KP(0,0,3*b/4),KP(0,0,b)
+
+*get,nl,line,,num,maxd
+adrag,all,,,,,,nl-3,nl-2,nl-1,nl ! extrude along the last two lines created
+
+
+! Step 2: mesh, material, section
+et,1,281
+sectype,1,shell,,sandwich
+secdata,h,1,0,3
+
+mp,ex,1,Ex ! aluminium, ksi
+mp,prxy,1,prxy ! aluminium
+mp,dens,1,rho ! aluminium
+
+aesize,all,1000
+amesh,all
+
+eplot
+/replot
+
+! Step 3: place loads
+sinloadshell,q0/b,l
+
+! Step 4: place constraints
+nsel,s,loc,x,0
+nsel,a,loc,x,l
+d,all,ux,0,,,,uy,uz,rotx,roty
+nsel,all
+
+eplot
+/rep
+
+finish
+
+*if,ARG0,eq,1,then
+/solu
+antype,modal
+mxpand,0,,,0
+lumpm,0
+pstres,0
+modopt,lanb,5,0,0,,off
+solve
+
+*get,firstModeFreq,mode,1,freq
+
+dt = 1/(k*firstModeFreq)
+
+omega_ = firstModeFreq*2*pi
+massDamping_ = zeta*omega_
+t0_ = tau/omega_
+
+! Step 7: solve, dynamic (get dynamic response)
+eplot 
+/replot
+
+finish
+/solu
+antype,transient
+nlgeom,1
+deltim,dt
+alphad,massDamping_
+betad,0
+kbc,0
+lumpm,0
+outres,all,all
+
+! Step 7.2: replace loads
+sinloadbeam,q0,l,1
+time,1*t0_
+lswrite,1
+
+sinloadbeam,0,l,1
+time,2*t0_
+lswrite,2
+
+sinloadbeam,0,l,1
+time,3*t0_
+lswrite,3
+
+lssolve,1,3,1
+
+*else
+
+/solu
+antype,static
+nlgeom,on
+nsubst,50
+time,1
+arclen,on,1
+autots,off
+outres,all,all
+solve
+
+*endif
+
+! Step 7.3: plot transient analysis
+/post26
+nsol,2,NODE(l/2,a0,b/2),u,y,UY ! load the nodal displacement solution at the center of the arch to time-hist variable 2
+plvar,2
+/wait,5
+
+vget,time,1 
+vget,dispy,2 
+
+*cfopen,'geom3D','csv'
+*vwrite,'a0','E','I','L','q0','m','n'
+%C,%C,%C,%C,%C,%C,%C
+*vwrite,a0,Ex,Izz,l,q0,m,n
+%G,%G,%G,%G,%G,%G,%G
+*cfclos
+
+*cfopen,'results3D','csv'
+*vwrite,'P','uz'
+%C,%C
+*vwrite,time(1),dispy(1) 
+%G,%G 
+*cfclos
+
+/post1
+set,first
+!pldisp,0
+
+! /contour,all,18,-2*a,,0
+! plns,u,y
+! ! plns,s,eqv
+! ! antime,60,0.01,,1,1,1,3 ! low res
+! antime,fps*3*t0_,1/fps,,,1,1,3 ! animates a real-time animation with the specified number of frames per second over the time of the test
+! *status,PRM_

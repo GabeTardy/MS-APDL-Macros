@@ -1,0 +1,124 @@
+rs
+/prep7
+et,1,185 
+!*  
+! 0.009564
+length = 1
+k,,0,0  
+k,,length,0  
+k,,length,1  
+k,,0,1  
+k,,0,0,1
+k,,length,0,1
+k,,length,1,1
+k,,0,1,1
+v,1,2,3,4,5,6,7,8   
+
+MSHAPE,0,3D 
+MSHKEY,1
+!esize,0.1
+VMESH,all
+
+!mp,ex,1,10000e3
+!mp,prxy,1,0.3
+! n = 3
+! ExT = 10000e3
+! ExC = n*ExT
+! tb,user,1,1,4
+! tbtemp,0
+! tbdata,1,ExT,ExC,nut,nuc
+
+n = 1
+ExT = 45e6 !10000e3
+ExC = 100e6 !n*ExT
+n = ExC/ExT
+
+ExT = ExC
+
+h = 1
+h2 = h/(sqrt(n) + 1) ! compression zone height
+h1 = h*sqrt(n)/(sqrt(n) + 1)! tensile zone height
+
+elsize = 0.1! 05 !0.05
+epsilon = 10e-7 !7
+
+*if,n,gt,1,then
+	ExA = ExC
+*else
+	ExA = ExT
+*endif
+
+nut = 0.27
+nuc = 0.27
+
+! tb,user,1,1,4
+! tbtemp,0
+! tbdata,1,ExT,ExC,nut,nuc
+
+!set material = cast iron
+mp,ex,1,ExC
+mp,prxy,1,0 !0.27 !0.3
+
+tb,cast,1,1,1,isotropic
+
+! set compression curve
+tb,uniaxial,1,1,2,comp
+tbtemp,0
+tbpt,,0,0
+tbpt,,epsilon,epsilon*ExA
+tbpt,,0.1,0.1*ExC
+tbpt,,1,ExC
+tbpt,,2,2*ExC
+tbpt,,3,3*ExC
+tbpt,,10,10*ExC
+
+! set tension curve
+tb,uniaxial,1,1,3,tens
+tbtemp,0
+tbpt,,0,0
+tbpt,,epsilon,epsilon*ExA
+tbpt,,0.1,0.1*ExT
+tbpt,,1,ExT
+tbpt,,2,2*ExT
+tbpt,,3,3*ExT
+tbpt,,10,10*ExT
+
+asel,s,loc,y,1,1
+sfa,all,,pres,100 !1000000
+
+asel,s,loc,y,0,0
+sfa,all,,pres,100 !1000000
+
+!asel,s,loc,y,0,0
+asel,s,loc,x,0,0
+!da,all,all
+
+asel,all
+
+/solu
+/pbc,all,,1
+/psf,pres,norm,1,0,1
+eplot
+
+sftran
+dtran
+mp,dens,1,0.079
+
+time,1
+lswrite,1
+
+/solu
+antype,transient
+nlgeom,on
+nsubst,50
+outres,all,all
+outres,svar,all
+autots,off
+deltim,0.01
+ncnv,0,0,0,300
+lssolve,1,1,1
+
+!view,iso
+/post1
+set,last
+plns,s,y
