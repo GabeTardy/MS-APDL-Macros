@@ -28,13 +28,16 @@ pi = 3.14159265359 ! Set pi if not already set
 k,1
 *do,i,1,nSeg
 
-	! Set the next keypoint: [vv X vv]  [vv Y vv]                        [ vv Z vv ]
+	! Calculate z-position of the current keypoint
+	zVal = a*sin(pi * i/nSeg) + a*e*sin(2*pi * i/nSeg)
+
+	! Set the next keypoint: [vv X vv]  [vv Y vv]       [ vv Z vv ]
 	*if,z,eq,0,then
-		k, i+1, xOffset + i/nSeg*length, yOffset +  a*sin(pi * i/nSeg) + a*e*sin(2*pi * i/nSeg),   zOffset
+		k, i+1, xOffset + i/nSeg*length, yOffset + zVal,  zOffset
 	*elseif,z,eq,1,then
-		k, i+1, xOffset + i/nSeg*length, yOffset,   a*sin(pi * i/nSeg) + a*e*sin(2*pi * i/nSeg)  + zOffset
+		k, i+1, xOffset + i/nSeg*length, yOffset,  zVal + zOffset
 	*else
-		k, i+1, xOffset + i/nSeg*length, yOffset, -(a*sin(pi * i/nSeg) + a*e*sin(2*pi * i/nSeg)) + zOffset
+		k, i+1, xOffset + i/nSeg*length, yOffset, -zVal + zOffset
 	*endif
 
 	! Connect the last two keypoints with a line
