@@ -2,7 +2,18 @@ finish
 /clear
 /psearch,'C:\Users\gjtardy42\OneDrive - Tennessee Tech University\MS - Research\Code\Ansys'
 /replot
-/cmap,'solarizeddark','cmap'
+/cmap,'viridis2','cmap'
+/device,font,1,Inconsolata,700,,24
+*do,i,1,15
+/color,num,i,i
+*enddo
+
+*abbr,SAVE_DB,
+*abbr,RESUM_DB, 
+*abbr,QUIT, 
+*abbr,POWRGRPH, 
+*abbr,Reset,rs 
+*abbr,ExportImg,png
 
 ! option constants
 ! these constants have been set up to ease querying and "having to remember things"

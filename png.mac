@@ -1,0 +1,33 @@
+! ! Start a new PNG filestream
+! /show,png,,0
+
+! ! Improve curved element display (number of facets/element)
+! /efacet,4
+
+! ! Set PNG compression off
+! pngr,comp,0 !1,-1  
+
+! ! Set orientation to horizontal
+! pngr,orient,horizontal
+
+! ! Export full-color plot
+! pngr,color,2
+
+! ! Use "stroke text" (0) vs. "bitmap" (1) fonts
+! pngr,tmod,1
+
+! ! Maximize file resolution
+! /gfile,2400
+
+! ! Replot current display
+! /replot
+
+! ! Close filestream
+! /show,close
+
+/show,tiff
+/efacet,4
+/gfile,2400
+/replot
+/show,close
+/efacet,1
