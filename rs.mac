@@ -2,7 +2,7 @@ finish
 /clear
 /psearch,'C:\Users\gjtardy42\OneDrive - Tennessee Tech University\MS - Research\Code\Ansys'
 /replot
-/cmap,'test','cmap'
+/cmap,'solarizeddark','cmap'
 
 ! option constants
 ! these constants have been set up to ease querying and "having to remember things"
