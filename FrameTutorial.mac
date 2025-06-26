@@ -1,0 +1,67 @@
+rs
+
+/PREP7
+et,1,189
+
+mp,ex,1,29000e3
+mp,prxy,1,0.3
+
+sectype,1,beam,rect,beans
+secdata,1,1
+
+k,,0,12,0
+k,,12,12,0
+k,,24,12,0
+k,,24,0,0
+
+l,1,2
+l,2,3
+l,3,4
+
+lesize,all,2
+lmesh,all
+
+! Boundary conditions
+d,NODE(0,12,0),ux,0,,,,uy,uz,rotx,roty
+d,NODE(24,0,0),uy,0
+
+/PBC,ALL,,1
+/PSF,PRES,NORM,1
+eplot
+
+! Force
+f,NODE(12,12,0),fy,-100
+
+esel,s,cent,x,24
+sfbeam,all,2,pres,20
+esel,all
+
+eplot
+
+! Solution
+/SOLU
+solve
+
+! Postprocessing
+/post1
+set,last
+pldisp,2
+
+/eshape,1
+plns,s,x
+
+etable,shearI,smisc,6
+etable,shearJ,smisc,19
+etable,momentI,smisc,3
+etable,momentJ,smisc,16
+
+/RGB,INDEX,100,100,100, 0
+/RGB,INDEX, 80, 80, 80, 13
+/RGB,INDEX, 60, 60, 60, 14
+/RGB,INDEX, 0, 0, 0, 15
+
+plls,shearI,shearJ
+
+/wait,2
+
+plls,momentI,momentJ

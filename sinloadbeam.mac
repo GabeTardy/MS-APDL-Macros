@@ -1,44 +1,54 @@
-loadMagnitude = ARG1
-guessedLength = ARG2
-loadDirection = ARG3 ! 0 - Vertical direction is Z direction; 1 - Vertical direction is Y direction
+! sinloadbeam.mac
+! Written by - Gabriel Tardy
+! This macro applies a sinusoidal load to a an arbitrary arch.
+! For more information, please see my thesis section 4.1.1.3: "Placement of Boundary Conditions"
 
+loadMagnitude = ARG1 ! Magnitude of the load
+guessedLength = ARG2 ! Horizontal length of the arch (initial guess; this macro will refine the value)
+loadDirection = ARG3 ! 0 (default) - Vertical direction is Z direction; 1 - Vertical direction is Y direction
+
+! Set load keys fv (vertical direction key) and fh (horizontal direction key)
 fv = loadDirection + 1 ! 1 -z direction, 2 +y direction
 fh = 3 ! 3 +x direction
 
-! get maximum length (may not be real length based on integer number of cells)
+! Get maximum length (may not be real length based on integer number of metamaterial cells, if used)
 kpx = KP(guessedLength,0,0)
 actualLength = KX(kpx)
 
-pi=3.14159265359
+! Set pi if not already set
+pi = 3.14159265359
 
+! Iterate over all elements in the arch
 *get,numl,elem,,count
 i = 0
 *do,kCounter,1,numl
 	
+	! Traverse to next element
 	i = ELNEXT(i)
 	
-	! get start and end node numbers
+	! Get start and end node numbers
 	n1 = NELEM(i,1)
 	n2 = NELEM(i,2)
 	
-	! get x- and z-position of each node
+	! Get x- and z-position of each node
 	n1x = NX(n1)
 	n1z = NZ(n1)
 	
 	n2x = NX(n2)
 	n2z = NZ(n2)
 	
-	! angle
+	! Determine element orientation angle
 	*if,n2x,eq,n1x,then
 		ang = 0
 	*else
 		ang = atan((n2z-n1z)/(n2x-n1x))
 	*endif
 	
+	! Determine load magnitudes at nodes 1, 2
 	q1 = loadMagnitude*sin(pi*n1x/actualLength)
 	q2 = loadMagnitude*sin(pi*n2x/actualLength)
 	
-	! make a surface load on the line interpolating linearly between f of the two keypoints' x positions
+	! Make a surface load on the line interpolating linearly between f of the two keypoints' x positions
 	sfbeam,i,fv,pres,q1*cos(ang),q2*cos(ang)
 	sfbeam,i,fh,pres,-q1*sin(ang),-q2*sin(ang)
 	
