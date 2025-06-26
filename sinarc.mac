@@ -1,24 +1,42 @@
-length=ARG1
-ndivs=ARG2
-*if,ndivs,eq,0,then
-	ndivs = length
+! sinarc.mac
+! Written by - Gabriel Tardy
+! Adapted from Sam Dunham
+! This macro creates a sinusoidal arch with a specified rise and mode 2 geometric imperfection.
+! For more information, please see my thesis section 4.1.1.1: "Arch Model Discretization"
+
+length = ARG1 ! Horizontal length of the arch
+
+nSeg = ARG2 ! Number of elements in the arch
+*if,nSeg,eq,0,then
+	nSeg = NINT(length) ! Default number of elements is equal to the nearest integer length of the arch (fallback)
 *endif
 
-a=ARG3 ! rise of arch
-z=ARG4 ! toggle whether up is z or whatever
-e=ARG5 ! geometric imperfection constant
-pi=3.1415926535
+a = ARG3 ! Rise of the arch
+z = ARG4 ! Toggle whether up is z: 0 - y is up, 1 - z is up, 2 - -z is up
+e = ARG5 ! Mode 2 geometric imperfection constant (for more information, see Sam Dunham's thesis section 4.5: "Geometric Imperfections")
 
+xOffset = ARG6 ! Horizontal offset of the arch (default is 0)
+yOffset = ARG7 ! Y offset of the arch (default is 0)
+zOffset = ARG8 ! Z offset of the arch (default is 0)
+
+pi = 3.14159265359 ! Set pi if not already set
+
+! Make sure we are in the preprocessor
 /prep7
-ndivs = ndivs*2
-step = length/ndivs
 
+! Set the first keypoint at 0, 0
 k,1
-*do,i,1,ndivs
+*do,i,1,nSeg
+
+	! Set the next keypoint: [vv X vv]  [vv Y vv]                        [ vv Z vv ]
 	*if,z,eq,0,then
-		k,i+1,i*step,a*sin(pi*(i*step)/length)+a*e*sin(2*pi*i*step/length)
+		k, i+1, xOffset + i/nSeg*length, yOffset +  a*sin(pi * i/nSeg) + a*e*sin(2*pi * i/nSeg),   zOffset
+	*elseif,z,eq,1,then
+		k, i+1, xOffset + i/nSeg*length, yOffset,   a*sin(pi * i/nSeg) + a*e*sin(2*pi * i/nSeg)  + zOffset
 	*else
-		k,i+1,i*step,0,a*sin(pi*(i*step)/length)+a*e*sin(2*pi*i*step/length)
+		k, i+1, xOffset + i/nSeg*length, yOffset, -(a*sin(pi * i/nSeg) + a*e*sin(2*pi * i/nSeg)) + zOffset
 	*endif
+
+	! Connect the last two keypoints with a line
 	l,i,i+1
 *enddo
