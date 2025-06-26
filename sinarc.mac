@@ -29,7 +29,7 @@ k,1
 *do,i,1,nSeg
 
 	! Calculate z-position of the current keypoint
-	zVal = a*sin(pi * i/nSeg) + a*e*sin(2*pi * i/nSeg)
+	zVal = a*sin(pi*i/nSeg) + a*e*sin(2*pi*i/nSeg)
 
 	! Set the next keypoint: [vv X vv]  [vv Y vv]       [ vv Z vv ]
 	*if,z,eq,0,then
