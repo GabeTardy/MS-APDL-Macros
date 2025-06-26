@@ -42,7 +42,7 @@ pi = 3.1415926535
 
 ! Dimensioning
 l = a0/lambda
-ndiv = l*4
+ndiv = 20
 h = a0*(3*m)**(0.5)
 b = h*2
 Izz = b*(h**3)/12
@@ -51,7 +51,7 @@ q0 = n*Ex*Izz*a0*(pi/l)**4
 !-!
 
 !!- Element Model
-et,1,189 ! SHELL281
+et,1,189
 sectype,1,beam,rect
 secdata,h,b
 !-!
@@ -65,7 +65,7 @@ mp,dens,1,rho
 !!- Physical Model
 seltol,0.001 ! setup selection tolerance (used later for constraints)
 
-sinarc,l,ndiv,a0 ! setup sine arc, l long, with ndiv divisions, and a0 high.
+sinarc,l,ndiv,a0,2 ! setup sine arc, l long, with ndiv divisions, and a0 high, in the -z-direction
 
 ! show progress
 lplot
@@ -128,16 +128,16 @@ d,NODE(l,0,0),ux,0,,,,uy,uz,rotx,roty
 		Total Expected TIME: %g
 	
 		! Place Load Steps
-		sinloadbeam,q0,l,1
+		sinloadbeam,q0,l,0
 		time,1*n*t0_
 		lswrite,1
 		/wait,0.5
 
-		sinloadbeam,-q0/2,l,1
+		sinloadbeam,-q0/2,l,0
 		time,5/2*n*t0_
 		lswrite,2
 
-		sinloadbeam,0,l,1
+		sinloadbeam,0,l,0
 		time,3*n*t0_
 		lswrite,3
 
@@ -148,20 +148,20 @@ d,NODE(l,0,0),ux,0,,,,uy,uz,rotx,roty
 		Total Expected TIME: %g
 		
 		! Place Load Steps
-		sinloadbeam,q0,l,1
+		sinloadbeam,q0,l,0
 		time,1*n*t0_
 		lswrite,1
 		/wait,0.5
 
-		sinloadbeam,0,l,1
+		sinloadbeam,0,l,0
 		time,2*n*t0_
 		lswrite,2
 
-		sinloadbeam,q0,l,1
+		sinloadbeam,q0,l,0
 		time,3*n*t0_
 		lswrite,3
 
-		sinloadbeam,0,l,1
+		sinloadbeam,0,l,0
 		time,4*n*t0_
 		lswrite,4
 
@@ -170,18 +170,18 @@ d,NODE(l,0,0),ux,0,,,,uy,uz,rotx,roty
 	*endif
 *else
 	! Place Load
-	sinloadbeam,q0,l,1
+	sinloadbeam,q0,l,0
 	/wait,0.5
 	
-	/solu
-	antype,static
-	nlgeom,on
-	nsubst,50
-	time,1
-	arclen,on,1
-	autots,off
-	outres,all,all
-	solve
+	! /solu
+	! antype,static
+	! nlgeom,on
+	! nsubst,50
+	! time,1
+	! arclen,on,1
+	! autots,off
+	! outres,all,all
+	! solve
 *endif
 !-!
 
