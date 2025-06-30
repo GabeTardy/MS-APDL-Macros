@@ -12,14 +12,13 @@
 rs ! clearing macro
 /rep ! replot screen
 /pbc,all,,1 ! setup view options
-/psf,pres,norm,2,1,on ! Show pressures on model (normal)
-/psf,pres,tanx,2,1,on ! Show pressures on model (tanx)
-/psf,pres,tany,2,1,on ! Show pressures on model (tany)
+/hbc,all,on ! Use improved rendering for hidden boundary conditions
+/psf,pres,norm,1,1,on ! Show pressures on model (normal)
 /eshape,1 ! show true cross-sections
-/number,0 ! Make colors represent materials and show the material number
-/pnum,mat,1
+! /number,0 ! Make colors represent materials and show the material number
+! /pnum,mat,1
 /efacet,4 ! show more accurate shell plots with mid-nodes (technical: require apdl to plot 4 facets/edge)
-view,side ! Show isometric view
+view,snap
 /prep7
 !-!
 
@@ -53,7 +52,8 @@ q0 = n*Ex*Izz*a0*(pi/l)**4
 !!- Element Model
 et,1,189
 sectype,1,beam,rect
-secdata,h,b
+secdata,b,h ! Correct orientation for z-vertical coordinate systems
+! secdata,h,b
 !-!
 
 !!- Material Model
@@ -82,8 +82,8 @@ eplot
 !-!
 
 !!- Apply Pin-Pin Boundary Conditions
-d,NODE(0,0,0),ux,0,,,,uy,uz,rotx,roty
-d,NODE(l,0,0),ux,0,,,,uy,uz,rotx,roty
+d,NODE(0,0,0),ux,0,,,,uy,uz,rotx,rotz
+d,NODE(l,0,0),ux,0,,,,uy,uz,rotx,rotz
 !-!
 
 !!- Perform Analyses
@@ -128,16 +128,16 @@ d,NODE(l,0,0),ux,0,,,,uy,uz,rotx,roty
 		Total Expected TIME: %g
 	
 		! Place Load Steps
-		sinloadbeam,q0,l,0
+		sinloadbeam,q0,l,2
 		time,1*n*t0_
 		lswrite,1
 		/wait,0.5
 
-		sinloadbeam,-q0/2,l,0
+		sinloadbeam,-q0/2,l,2
 		time,5/2*n*t0_
 		lswrite,2
 
-		sinloadbeam,0,l,0
+		sinloadbeam,0,l,2
 		time,3*n*t0_
 		lswrite,3
 
@@ -148,20 +148,20 @@ d,NODE(l,0,0),ux,0,,,,uy,uz,rotx,roty
 		Total Expected TIME: %g
 		
 		! Place Load Steps
-		sinloadbeam,q0,l,0
+		sinloadbeam,q0,l,2
 		time,1*n*t0_
 		lswrite,1
 		/wait,0.5
 
-		sinloadbeam,0,l,0
+		sinloadbeam,0,l,2
 		time,2*n*t0_
 		lswrite,2
 
-		sinloadbeam,q0,l,0
+		sinloadbeam,q0,l,2
 		time,3*n*t0_
 		lswrite,3
 
-		sinloadbeam,0,l,0
+		sinloadbeam,0,l,2
 		time,4*n*t0_
 		lswrite,4
 
@@ -170,71 +170,115 @@ d,NODE(l,0,0),ux,0,,,,uy,uz,rotx,roty
 	*endif
 *else
 	! Place Load
-	sinloadbeam,q0,l,0
+	sinloadbeam,q0,l,2
 	/wait,0.5
 	
-	! /solu
-	! antype,static
-	! nlgeom,on
-	! nsubst,50
-	! time,1
-	! arclen,on,1
-	! autots,off
-	! outres,all,all
-	! solve
+	view,snap
+	eplot
+	/replot
+
+	/solu
+	antype,static
+	nlgeom,on
+	nsubst,50
+	time,1
+	arclen,on,1
+	autots,off
+	outres,all,all
+	solve
 *endif
 !-!
 
 !!- Plot Results
 /post1
-set,first
-view,side
+set,last
+view,snap
 
 ! to show contour plot of displacement
 /dscale,all,auto
-plnsol,u,y,0,1
-/wait,5
+plnsol,u,z,0,1
 !-!
 
 !!- Plot Displacement Graph
 /post26
-nsol,2,NODE(l/2,a0,b/2),u,y,UY ! load the nodal displacement solution at the center of the arch to time-hist variable 2
-plvar,2
+numvar,200
+
+! Access data from test first - if this data is not accessed then filled data variables will not be created (possible bug in APDL)
+nsol,4,NODE(l/2,a0,b/2),u,z,UZ ! load the nodal displacement solution at the center of the arch to time-hist variable 2
+filldata,6,,,,1 ! Create a time-history variable with only ones (variable 6)
+filldata,5,,,,-a0 ! Create a time-history variable with the rise (variable 5) ! WHY NEGATIVE????????
+quot,7,4,5 ! Divide THV 4 by THV 5
+add,8,7,6,,r ! Add THV 4/THV 5 (=THV 7) to THV 6 (=1) to get the nondimensionalized displacement r
+
+! Recreate nondimensionalized load u
+filldata,2,,,,q0/(Ex*Izz*(pi/L)**4*a0) ! Fill a time-history variable with the nondimensionalized load
+varnam,2,umult ! Rename the variable
+prod,3,1,2,,u ! Multiply the nondimensionalized load by the loading proportion to get u
+
+! Determine exact static solution
+filldata,9,,,,-m ! Fill variable 9 with NEGATIVE!!! m
+add,10,6,9 ! subtract m from 1 [(1-m)]
+prod,11,8,8 ! square r [(r^2)]
+add,12,11,10,,,,,,-1 ! subtract (1-m) from r^2 [r^2 - (1-m)]
+quot,13,8,9 ! divide r by -m [-r/m]
+prod,14,13,12 ! multiply -r/m by (r^2 - (1-m)) [(-r/m)*(r^2 - (1-m))]
+add,15,6,14,,uExact ! add 1 to (-r/m)*(r^2 - (1-m)) [1 + (-r/m)*(r^2 - (1-m))] to get the exact solution!
+
+!/axlab,x,'u'
+!/axlab,y,'r'
+!xvar,3
+!plvar,8
+
+/axlab,x,'r'
+/axlab,y,'u'
+xvar,8
+plvar,3,15
 /wait,5
 !-!
 
-!!- Export Results to Nondimensionalizer
-vget,time,1 
-vget,dispy,2
+!! - Export Results to CSV (already nondimensionalized in Ansys!)
+vget,uExp,3
+vget,rExp,8
 
-*if,ARG1,eq,1,then
-	*cfopen,'geom2DT','csv'
-	*vwrite,'a0','E','I','L','n','p','A','t0'
-%C,%C,%C,%C,%C,%C,%C,%C
-	*vwrite,a0,Ex,Izz,l,n,omega_,b*h,t0_
-%G,%G,%G,%G,%G,%G,%G,%G
-	*cfclos
-
-	*cfopen,'results2DT','csv'
-	*vwrite,'t','uz'
+*cfopen,'Snap2D','csv'
+	*vwrite,'u','r'
 %C,%C
-*else
-	*cfopen,'geom2D','csv'
-	*vwrite,'a0','E','I','L','q0','m','n'
-%C,%C,%C,%C,%C,%C,%C
-	*vwrite,a0,Ex,Izz,l,q0,m,n
-%G,%G,%G,%G,%G,%G,%G
-	*cfclos
-
-	*cfopen,'results2D','csv'
-	*vwrite,'P','uz'
-%C,%C
-*endif
-
-*vwrite,time(1),dispy(1) 
+	*vwrite,uExp(1),rExp(1) 
 %G,%G 
 *cfclos
-!-!
+
+! !!- Export Results to Nondimensionalizer
+! vget,time,1 
+! vget,dispy,2
+
+! *if,ARG1,eq,1,then
+! 	*cfopen,'geom2DT','csv'
+! 	*vwrite,'a0','E','I','L','n','p','A','t0'
+! %C,%C,%C,%C,%C,%C,%C,%C
+! 	*vwrite,a0,Ex,Izz,l,n,omega_,b*h,t0_
+! %G,%G,%G,%G,%G,%G,%G,%G
+! 	*cfclos
+
+! 	*cfopen,'results2DT','csv'
+! 	*vwrite,'t','uz'
+! %C,%C
+! *else
+! 	*cfopen,'geom2D','csv'
+! 	*vwrite,'a0','E','I','L','q0','m','n'
+! %C,%C,%C,%C,%C,%C,%C
+! 	*vwrite,a0,Ex,Izz,l,q0,m,n
+! %G,%G,%G,%G,%G,%G,%G
+! 	*cfclos
+
+! 	*cfopen,'results2D','csv'
+! 	*vwrite,'P','uz'
+! %C,%C
+! *endif
+
+! *vwrite,time(1),dispy(1) 
+! %G,%G 
+! *cfclos
+! !-!
 
 *if,ARG3,eq,1,then
 snapanim,ARG2

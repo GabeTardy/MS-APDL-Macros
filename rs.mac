@@ -6,6 +6,7 @@ finish
 /device,font,1,Inconsolata,700,,24
 *do,i,1,15
 /color,num,i,i
+/color,curve,i,i
 *enddo
 
 *abbr,SAVE_DB,

@@ -5,7 +5,11 @@
 
 loadMagnitude = ARG1 ! Magnitude of the load
 guessedLength = ARG2 ! Horizontal length of the arch (initial guess; this macro will refine the value)
-loadDirection = ARG3 ! 0 (default) - Vertical direction is Z direction; 1 - Vertical direction is Y direction
+loadDirection = ARG3 ! 0 (default) - Vertical direction is +Z direction; 1 - Vertical direction is Y direction; 2 - Vertical direction is -Z direction
+*if,loadDirection,eq,2,then
+	loadDirection = 0 
+	loadMagnitude = -loadMagnitude
+*endif
 
 ! Set load keys fv (vertical direction key) and fh (horizontal direction key)
 fv = loadDirection + 1 ! 1 -z direction, 2 +y direction

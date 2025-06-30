@@ -13,7 +13,9 @@ snap = 422
 /view,1,1,2,3
 /ang,1
 *elseif,orientation,eq,snap,then
-! empty for now
+    /auto,all   
+    /view,all,,1
+    /angle,all,0
 *endif
 
 /rep 
