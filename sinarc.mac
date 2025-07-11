@@ -24,8 +24,8 @@ pi = 3.14159265359 ! Set pi if not already set
 ! Make sure we are in the preprocessor
 /prep7
 
-! Set the first keypoint at 0, 0
-k,1
+! Set the first keypoint at local 0, 0, 0 of the arch (at the offset start position)
+k,1,xOffset,yOffset,zOffset
 *do,i,1,nSeg
 
 	! Calculate z-position of the current keypoint
