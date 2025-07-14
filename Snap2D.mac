@@ -13,7 +13,7 @@ rs ! clearing macro
 /rep ! replot screen
 /pbc,all,,1 ! setup view options
 /hbc,all,on ! Use improved rendering for hidden boundary conditions
-/psf,pres,norm,1,1,on ! Show pressures on model (normal)
+/psf,pres,norm,2,1,on ! Show pressures on model (normal)
 /eshape,1 ! show true cross-sections
 ! /number,0 ! Make colors represent materials and show the material number
 ! /pnum,mat,1

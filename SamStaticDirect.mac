@@ -1,4 +1,4 @@
-inish 
+finish 
 /clear 
 ! Step 0 
 m = 1/2 
@@ -87,7 +87,7 @@ plvar,2
 ! Step 13: Output Data 
 vget,percent,1 
 vget,dispy2 
-*cfopen,’your_path_here’,’csv’ 
+*cfopen,'your_path_here','csv'
 *vwrite,percent(1),dispy(1) 
 %G %G 
 *cfclos

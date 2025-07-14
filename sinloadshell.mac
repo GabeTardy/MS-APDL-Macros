@@ -35,8 +35,9 @@ i = 0
 	q2 = loadMagnitude*sin(pi*n2x/actualLength)
 	
 	! make a surface load on the line interpolating linearly between f of the two keypoints' x positions
-	sfe,i,1,pres,,q1*cos(ang),q2*cos(ang),q2*cos(ang),q1*cos(ang) ! load key 2 - lateral
-	sfe,i,6,pres,,-q1*sin(ang),-q2*sin(ang),-q2*sin(ang),-q1*sin(ang) ! load key 6 - axial?
+	sfe,i,2,pres,,q1*cos(ang),q2*cos(ang),q2*cos(ang),q1*cos(ang)
+	sfe,i,4,pres,,-q2*sin(ang),-q2*sin(ang)
+	sfe,i,6,pres,,q1*sin(ang),q1*sin(ang)
 	
 	! 1: -z direction
 	! 3: +x direction
