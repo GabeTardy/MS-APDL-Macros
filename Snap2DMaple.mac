@@ -1,0 +1,150 @@
+!!- Setup
+rs ! clearing macro
+
+! Load input data from Maple
+
+! Load geometry data
+/inquire,numConstants,lines,'Snap2DGeom','csv'
+*dim,test,table,numConstants,1
+*tread,test,'Snap2DGeom','csv',,0
+*status,test
+
+! Load load data
+/inquire,numLoadSteps,lines,'Snap2DLoading','csv'
+numLoadSteps = numLoadSteps - 1 ! True number of load steps does not include first load of 0 at time = 0
+*dim,test2,table,numLoadSteps,2
+*tread,test2,'Snap2DLoading','csv',,0
+*status,test2
+
+! Configurable Sinusoidal Snapthrough - Beam Elements
+! Written by Gabriel Tardy
+! Arguments:
+! ARG1:
+!	- 0: Static (default)
+!	- 1: Modal+transient
+! ARG2:
+!	- 0: Load+Pull (single-cycle) (default)
+!	- 1: Load+Load (double-cycle)
+
+/rep ! replot screen
+/pbc,all,,1 ! setup view options
+/hbc,all,on ! Use improved rendering for hidden boundary conditions
+/psf,pres,norm,2,1,on ! Show pressures on model (normal)
+/eshape,1 ! show true cross-sections
+! /number,0 ! Make colors represent materials and show the material number
+! /pnum,mat,1
+/efacet,4 ! show more accurate shell plots with mid-nodes (technical: require apdl to plot 4 facets/edge)
+view,snap
+/prep7
+!-!
+
+fps = 60
+kPeriod = 7
+
+l = test(1)
+h = test(2)
+b = test(3)
+a0 = test(4)
+Ex = test(5)
+rho = test(6)
+prxy = 0
+omega_ = test(7)
+alphad = test(8)
+ndiv = 20
+
+!!- Element Model
+et,1,189
+sectype,1,beam,rect
+secdata,b,h ! Correct orientation for z-vertical coordinate systems
+! secdata,h,b
+!-!
+
+!!- Material Model
+mp,ex,1,Ex
+mp,prxy,1,prxy
+mp,dens,1,rho
+!-!
+
+!!- Physical Model
+seltol,0.001 ! setup selection tolerance (used later for constraints)
+
+sinarc,l,ndiv,a0,2 ! setup sine arc, l long, with ndiv divisions, and a0 high, in the -z-direction
+
+! show progress
+
+!!- Meshing
+lesize,all,,,1
+lmesh,all
+eplot
+/replot
+!-!
+
+!!- Apply Pin-Pin Boundary Conditions
+d,NODE(0,0,0),ux,0,,,,uy,uz,rotx,rotz
+d,NODE(l,0,0),ux,0,,,,uy,uz,rotx,rotz
+!-!
+
+!!- Perform Analyses
+
+! Step 7: solve, dynamic (get dynamic response)
+eplot 
+/replot
+
+/solu
+antype,transient
+nlgeom,on
+deltim,1/(kPeriod*omega_)
+alphad,alphad
+betad,0
+kbc,0
+lumpm,0
+outres,all,all
+
+*do,ii,1,numLoadSteps
+    sinloadbeam,test2(ii,2),l,2
+    time,test2(ii,1)
+    lswrite,ii
+
+    eplot
+    /replot
+
+    *msg,ui,ii,numLoadSteps
+Number of load steps inputted: %I of %G
+/wait,0.5
+*enddo
+
+*msg,ui,test2(numLoadSteps,1)
+Total Expected TIME: %g
+
+! Solve
+lssolve,1,numLoadSteps,1
+
+! Send data back to Maple
+/post26
+nsol,2,NODE(L/2, 0, a0),u,z
+
+vget,time,1
+vget,dz,2
+
+*cfopen,'Snap2DOutput','csv'
+*vwrite,time(1),dz(1)
+%G,%G
+*cfclos
+
+!- Plot Results
+/post1
+/gline,1,-1
+set,last
+view,snap
+
+!plns,u,z,0,1
+plns,s,x,0,1
+
+! Calculate total number of frames required (the real time of the last load step multiplied by the number of frames per second, rounded down)
+numFrames = NINT(test2(numLoadSteps,1)*fps)
+
+! Create an animation of the previously displayed data
+antime,numFrames,1/fps,,1,1,1,numLoadSteps
+
+! Make sure that the animation plays forward only
+anim,,1,1/fps
