@@ -1,147 +1,144 @@
-!!- Setup
-rs ! clearing macro
+! Maple-Configured Sinusoidal Snapthrough
+! Written by Gabriel Tardy, July 2025
+! Prerequisites:
+! Snap2DMaple.mw (Maple file)
+! rs.mac (+viridis2.cmap)
+! bimodulus.mac
+! sinarc.mac
+! sinloadbeam.mac
+! view.mac
 
-! Load input data from Maple
+!!- Setup
+rs
 
 ! Load geometry data
 /inquire,numConstants,lines,'Snap2DGeom','csv'
-*dim,test,table,numConstants,1
-*tread,test,'Snap2DGeom','csv',,0
-*status,test
+*dim,Snap2DGeom,table,numConstants,1
+*tread,Snap2DGeom,'Snap2DGeom','csv',,0
 
 ! Load load data
 /inquire,numLoadSteps,lines,'Snap2DLoading','csv'
 numLoadSteps = numLoadSteps - 1 ! True number of load steps does not include first load of 0 at time = 0
-*dim,test2,table,numLoadSteps,2
-*tread,test2,'Snap2DLoading','csv',,0
-*status,test2
+*dim,LoadSteps,table,numLoadSteps,2
+*tread,LoadSteps,'Snap2DLoading','csv',,0
 
-! Configurable Sinusoidal Snapthrough - Beam Elements
-! Written by Gabriel Tardy
-! Arguments:
-! ARG1:
-!	- 0: Static (default)
-!	- 1: Modal+transient
-! ARG2:
-!	- 0: Load+Pull (single-cycle) (default)
-!	- 1: Load+Load (double-cycle)
-
-/rep ! replot screen
-/pbc,all,,1 ! setup view options
+/pbc,all,,1 ! Show boundary conditions
 /hbc,all,on ! Use improved rendering for hidden boundary conditions
 /psf,pres,norm,2,1,on ! Show pressures on model (normal)
 /eshape,1 ! show true cross-sections
-! /number,0 ! Make colors represent materials and show the material number
-! /pnum,mat,1
-/efacet,4 ! show more accurate shell plots with mid-nodes (technical: require apdl to plot 4 facets/edge)
-view,snap
-/prep7
-!-!
+view,snap ! Use my view macro to move the simulated camera to view the negative z-axis
 
-fps = 60
-kPeriod = 7
+fps = 60 ! Frames per second for the animation
+kPeriod = 7 ! Multiplier for the natural frequency; higher k gives better results at the cost of longer simulation time
 
-l = test(1)
-h = test(2)
-b = test(3)
-a0 = test(4)
-Ex = test(5)
-rho = test(6)
-prxy = 0
-omega_ = test(7)
-alphad = test(8)
+! Acquire data from the generated Snap2DGeom.csv file (containing geometry, setup, system data)
+l           = Snap2DGeom(1)
+h           = Snap2DGeom(2)
+b           = Snap2DGeom(3)
+a0          = Snap2DGeom(4)
+E1          = Snap2DGeom(5)
+rho         = Snap2DGeom(6)
+prxy        = Snap2DGeom(7)
+omega_      = Snap2DGeom(8)
+alphad      = Snap2DGeom(9)
+isbimodulus = Snap2DGeom(10)
+E2          = Snap2DGeom(11)
+beta        = Snap2DGeom(12)
+
+! Set the number of divisions for the sine arc
 ndiv = 20
 
-!!- Element Model
+! ---------- PREPROCESSOR ---------- !
+/prep7 ! Enter preprocessor
+
+! Define section properties for the beam
 et,1,189
 sectype,1,beam,rect
-secdata,b,h ! Correct orientation for z-vertical coordinate systems
-! secdata,h,b
-!-!
+secdata,b,h
 
-!!- Material Model
-mp,ex,1,Ex
-mp,prxy,1,prxy
-mp,dens,1,rho
-!-!
+! Define material properties for the beam
+*if,isbimodulus,eq,0,then ! Unimodulus properties
+    mp,ex,1,E1
+    mp,prxy,1,prxy
+    mp,dens,1,rho
+*else ! Bimodulus properties
+    bimodulus,E1,E2,prxy,prxy,isbimodulus
+*endif
 
-!!- Physical Model
-seltol,0.001 ! setup selection tolerance (used later for constraints)
+! Set a lower selection tolerance so that if a large number of elements are used, the right boundary conditions are still picked
+seltol,0.001
 
-sinarc,l,ndiv,a0,2 ! setup sine arc, l long, with ndiv divisions, and a0 high, in the -z-direction
+! Create a sine arc, l units long with ndiv divisions and a0 height in the -z-direction
+sinarc,l,ndiv,a0,2
 
-! show progress
-
-!!- Meshing
+! Mesh the beam with 1-unit elements.
 lesize,all,,,1
 lmesh,all
-eplot
-/replot
-!-!
 
-!!- Apply Pin-Pin Boundary Conditions
+! Apply pin-pin boundary conditions
 d,NODE(0,0,0),ux,0,,,,uy,uz,rotx,rotz
 d,NODE(l,0,0),ux,0,,,,uy,uz,rotx,rotz
-!-!
 
-!!- Perform Analyses
+! ---------- SOLUTION ---------- !
+/solu ! Enter solution processor
+antype,transient ! Set dynamic analysis
+nlgeom,on ! Set geometric nonlinearities on
+deltim,1/(kPeriod*omega_) ! Set time step size based on the natural frequency and kPeriod multiplier
+alphad,alphad ! Set the mass damping ratio
+betad,0 ! Set the stiffness damping ratio
+kbc,0 ! Set ramped loading
+lumpm,0 ! Do not use the lumped mass approximation
+outres,all,all ! Make sure all data is outputted
+outres,svar,all ! REALLY all data, this time.
 
-! Step 7: solve, dynamic (get dynamic response)
-eplot 
-/replot
-
-/solu
-antype,transient
-nlgeom,on
-deltim,1/(kPeriod*omega_)
-alphad,alphad
-betad,0
-kbc,0
-lumpm,0
-outres,all,all
-
+! Iterate over all load steps:
 *do,ii,1,numLoadSteps
-    sinloadbeam,test2(ii,2),l,2
-    time,test2(ii,1)
+    ! - Applying loading
+    sinloadbeam,LoadSteps(ii,2),l,2
+
+    ! - At a certain time
+    time,LoadSteps(ii,1)
+
+    ! - Write to the load step file
     lswrite,ii
 
-    eplot
-    /replot
-
+    ! - Update the interface with the loading
     *msg,ui,ii,numLoadSteps
 Number of load steps inputted: %I of %G
-/wait,0.5
 *enddo
 
-*msg,ui,test2(numLoadSteps,1)
+! Update the interface predicting the amount of time (the variable) the simulation will take
+*msg,ui,LoadSteps(numLoadSteps,1)
 Total Expected TIME: %g
 
-! Solve
+! Solve all load steps
 lssolve,1,numLoadSteps,1
 
 ! Send data back to Maple
 /post26
 nsol,2,NODE(L/2, 0, a0),u,z
 
+! Place the time and displacement data into new variables
 vget,time,1
 vget,dz,2
 
+! Open the output file, write the data, then close the output file
 *cfopen,'Snap2DOutput','csv'
 *vwrite,time(1),dz(1)
 %G,%G
 *cfclos
 
-!- Plot Results
+! Create an animation (only visible in non-batch mode)
 /post1
-/gline,1,-1
+/gline,all,-1 ! Remove element outlines (for sanity reasons)
 set,last
-view,snap
+view,snap ! Make sure that the view is in the right orientation
 
-!plns,u,z,0,1
+! Plot stress in x-direction
 plns,s,x,0,1
 
 ! Calculate total number of frames required (the real time of the last load step multiplied by the number of frames per second, rounded down)
-numFrames = NINT(test2(numLoadSteps,1)*fps)
+numFrames = NINT(LoadSteps(numLoadSteps,1)*fps)
 
 ! Create an animation of the previously displayed data
 antime,numFrames,1/fps,,1,1,1,numLoadSteps
