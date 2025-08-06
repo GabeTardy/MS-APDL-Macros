@@ -2,8 +2,10 @@ Results/
 *
 !*/
 !*.mac
+!*.ps1
 !*.md
 !*.cmap
 !*.F
 !.gitignore
+!apdl*.bat
 !Snap2DMaple.mw

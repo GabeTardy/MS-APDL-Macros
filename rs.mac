@@ -1,12 +1,15 @@
 finish
 /clear
-/psearch,'C:\Users\gjtardy42\OneDrive - Tennessee Tech University\MS - Research\Code\Ansys'
+/psearch,'C:\Users\GabrielTardy\Desktop\MS-APDL-Macros'
 /replot
 /cmap,'viridis2','cmap'
-/device,font,1,Inconsolata,700,,24
-*do,i,1,15
+/device,font,1,'PT Sans',400,,24
+/txtre,file,51,'C:\Users\GabrielTardy\Desktop\MS-APDL-Macros\TTUAnsysLogo',png,,png
+
+maxN_ = 11
+*do,i,1,maxN_
 /color,num,i,i
-/color,curve,i,i
+!/color,curve,i,i
 *enddo
 
 *abbr,SAVE_DB,

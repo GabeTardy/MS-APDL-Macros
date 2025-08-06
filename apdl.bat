@@ -1,0 +1,1 @@
+ansys252 -g -dir %~dp0 -d win32c

@@ -171,6 +171,7 @@ c
      &                 tsstif  (2),
      &                 stiffness (ncomp, ncomp),
      &                 E, Et, Ec, nu, nut, nuc, Kt, Kc, mut, muc,
+     &                 kuzBeta, E0, kuzAlphaE, nu0, kuzAlphaNu,
      &                 ZERO, HALF, THIRD, ONE, TWO, THREE, PI,
      &                 mu1, mu2, mu3, K, sedElPrev, 
      &                 ed1, ed2, ed3, J2, J3, eDev(ncomp), 
@@ -213,22 +214,38 @@ c May need to be atan only
 
       keycut   = 0
       cutFactor = 0.d0
-	  
-c If the fifth property is set (equal to 0), use invariant method
-      if (nProp .eq. 4 .or. prop(5) .eq. 0) then
 
-c Get the two Young's moduli and the Poisson's ratio
+c The input property vector is expected to contain the following values in the following positions:
+c prop(1) = Young's modulus in tension
+c prop(2) = Young's modulus in compression
+c prop(3) = Poisson's ratio in tension
+c prop(4) = Poisson's ratio in compression
+c prop(5) = Bimodulus method; 0 (Liu and Peddieson Step Function) or 1 (Kuznetsov Arctangent) (I am desperately trying to implement the Latorre/Montans hyperelastic formulation but am not doing well)
+c prop(6) = Kuznetsov Beta (Smoothness constant)
+
+c The output state vector can be expected to contain the following values in the following positions:
+c ustatev(1) = Dimensionality; 1 (1D), 2 (Plane Stress), 3 (3D)
+c ustatev(2) = Tensile/Compressive/Zero; 1 (Tensile), 0 (Zero), -1 (Compressive)
+c ustatev(3) = Trace of stress tensor
+c ustatev(4) = Young's modulus at current integration point
+c ustatev(5) = Poisson's ratio at current integration point
+c ustatev(6) = 
+	  
+c     If the fifth property is set (equal to 0 (Liu and Peddieson Step Function) or 1 (Kuznetsov Arctangent)), use invariant method
+      if (nProp .eq. 4 .or. prop(5) .eq. 0 .or. prop(5) .eq. 1) then
+
+c     Get the two Young's moduli and the Poisson's ratio
       Et        = prop(1)
       Ec        = prop(2)
       nut       = prop(3)
       nuc       = prop(4)
 	  
-c Get initial stress (fbc) on the element
+c     Get initial stress (fbc) on the element
       call get_ElmInfo('NCOMP', ncompgt)
       call vzero(sigi(1),ncompgt)
       call get_ElmData ('ISIG', elemId, kDomIntPt, ncompgt, sigi)
 	  
-c Determine total strain at this timestep (=Strain + dStrain) and place it in vector wStrain
+c     Determine total strain at this timestep (=Strain + dStrain) and place it in vector wStrain
       call vmove(Strain(1), wStrain(1), ncomp)
       call vapb1(wStrain(1), dStrain(1), ncomp)
 
@@ -244,37 +261,62 @@ C c ...for beam and truss elements
 C          strTrace = wStrain(1)
 C       end if
 	  
-c Determine trace of stress tensor...
-      if(ncomp .ge. 4) then
-c ...for 3D, plane strain, axisymmetric elements
-         strTrace = stress(1) + stress(2) + stress(3)
-      else if(nDirect .eq. 2 .and. ncomp .eq. 3) then
-c ...for plane stress elements
-         strTrace = stress(1) + stress(2)
+c ----- Liu and Peddieson Step Function Method -----
+      if (prop(5) .eq. 0) then
+c           Determine trace of stress tensor...
+            if(ncomp .ge. 4) then
+c                 ...for 3D, plane strain, axisymmetric elements
+                  strTrace = stress(1) + stress(2) + stress(3)
+            else if(nDirect .eq. 2 .and. ncomp .eq. 3) then
+c                 ...for plane stress elements
+                  strTrace = stress(1) + stress(2)
+            else
+c                 ...for beam and truss elements
+                  strTrace = stress(1)
+            end if  
+ 
+c           Toggle tensile/compressive behavior based on trace of strain
+            if(strTrace .gt. 0.d0) then
+                  E = Et
+                  nu = nut
+                  ustatev(2) = 1.d0
+            else if(strTrace .eq. 0.d0) then
+                  E = Et*Ec/(Et+Ec)
+                  nu = (nut*Ec + nuc*Et)/(Et+Ec)
+                  ustatev(2) = 0.d0
+            else
+                  E = Ec
+                  nu = nuc
+                  ustatev(2) = -1.d0
+            end if
       else
-c ...for beam and truss elements
-         strTrace = stress(1)
-      end if
+c --- Kuznetsov Arctangent Method (1D ONLY!) ---
+            strTrace = wStrain(1)
 
-c Set the third state variable to the trace stress (for debugging purposes)
-      ustatev(3) = strTrace	  
-	  
-c Toggle tensile/compressive behavior based on trace of strain
-      if(strTrace .gt. 0.d0) then
-         E = Et
-         nu = nut
-         ustatev(2) = 1.d0
-      else if(strTrace .eq. 0.d0) then
-         E = Et*Ec/(Et+Ec)
-         nu = (nut*Ec + nuc*Et)/(Et+Ec)
-         ustatev(2) = 0.d0
-      else
-         E = Ec
-         nu = nuc
-         ustatev(2) = -1.d0
+c           Set kuzBeta to the sixth property given (or 0.01 by default)
+            if (nProp .ge. 6) then
+                  kuzBeta = prop(6)
+            else 
+                  kuzBeta = 0.01d0
+            end if
+
+c           Calculate required E0/aE
+            E0 = (Ec + Et)/TWO
+            kuzAlphaE = (Ec - Et)/(Ec + Et)
+
+c           Extension of idea: calculate required nu0/aNu
+            nu0 = (nuc + nut)/TWO
+            kuzAlphaNu = (nuc - nut)/(nuc + nut)
+
+c           Calculate smoothed elastic modulus/poisson's ratio
+            E = E0 * (ONE - TWO*kuzAlphaE/pi*ATAN(strTrace/kuzBeta))
+            nu = nu0 * (ONE - TWO*kuzAlphaNu/pi*ATAN(strTrace/kuzBeta))
       end if
 	  
-c Set the fourth and fifth state variables to E, nu (for debugging purposes)
+c     Set the third state variable to the trace stress (for debugging purposes)
+      ustatev(3) = strTrace	
+
+c     Set the fourth and fifth state variables to E, nu (for debugging purposes)
       ustatev(4) = E  
       ustatev(5) = nu
 
@@ -344,8 +386,12 @@ c Determine elastic strain energy
       sedEl = sedEl * HALF
 	  
       return
-c *** Use Latorre and Montans Uncoupled Strain Formulation
-      else if (nProp .ge. 5 .and. prop(5) .eq. 1) then
+
+
+
+
+c *** Use Latorre and Montans Uncoupled Strain Formulation (DO NOT USE! BROKEN RIGHT NOW AND I'M NOT PAID FOR THIS ONE!)
+      else if (nProp .ge. 5 .and. prop(5) .eq. 2) then
 c *** Get properties as before
       Et        = prop(1)
       Ec        = prop(2)

@@ -1,0 +1,1 @@
+ansys252 -b -dir %~dp0 -i usermat.mac -o apdlCompile.out

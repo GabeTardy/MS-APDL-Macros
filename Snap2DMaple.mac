@@ -29,7 +29,6 @@ numLoadSteps = numLoadSteps - 1 ! True number of load steps does not include fir
 view,snap ! Use my view macro to move the simulated camera to view the negative z-axis
 
 fps = 60 ! Frames per second for the animation
-kPeriod = 7 ! Multiplier for the natural frequency; higher k gives better results at the cost of longer simulation time
 
 ! Acquire data from the generated Snap2DGeom.csv file (containing geometry, setup, system data)
 l           = Snap2DGeom(1)
@@ -44,6 +43,9 @@ alphad      = Snap2DGeom(9)
 isbimodulus = Snap2DGeom(10)
 E2          = Snap2DGeom(11)
 beta        = Snap2DGeom(12)
+q0          = Snap2DGeom(13)
+
+kPeriod = 5 !*(isbimodulus/2+1) ! Multiplier for the natural frequency; higher k gives better results at the cost of longer simulation time. We multiply the value by isBimodulus so that if the bimodulus model is used, more iterations are also used.
 
 ! Set the number of divisions for the sine arc
 ndiv = 20
@@ -60,10 +62,10 @@ secdata,b,h
 *if,isbimodulus,eq,0,then ! Unimodulus properties
     mp,ex,1,E1
     mp,prxy,1,prxy
-    mp,dens,1,rho
 *else ! Bimodulus properties
-    bimodulus,E1,E2,prxy,prxy,isbimodulus
+    bimodulus,E1,E2,prxy,prxy,isbimodulus,beta
 *endif
+mp,dens,1,rho
 
 ! Set a lower selection tolerance so that if a large number of elements are used, the right boundary conditions are still picked
 seltol,0.001
@@ -79,9 +81,46 @@ lmesh,all
 d,NODE(0,0,0),ux,0,,,,uy,uz,rotx,rotz
 d,NODE(l,0,0),ux,0,,,,uy,uz,rotx,rotz
 
-! ---------- SOLUTION ---------- !
+! ---------- STATIC SOLUTION ---------- !
 /solu ! Enter solution processor
+antype,static ! Set static analysis
+nlgeom,on ! Set geometric nonlinearities on
+nsubst,50 ! Use 50 substeps minimum
+arclen,on,1 ! Turn on arc length method/set a maximum radius
+outres,all,all ! Make sure all data is outputted
+outres,svar,all ! REALLY all data, this time.
+
+! Appy maximum static load
+sinloadbeam,q0,l,2
+solve
+
+! Send data back to Maple (Static)
+/post26
+nsol,2,NODE(L/2, 0, a0),u,z
+plvar,2
+
+! Place the time and displacement data into new variables
+vget,time,1
+vget,dz,2
+
+! Open the output file, write the data, then close the output file
+*cfopen,'Snap2DOutputStatic','csv'
+*vwrite,time(1),dz(1)
+%G,%G
+*cfclos
+
+! ---------- TRANSIENT SOLUTION ---------- !
+finish
+/solu ! Enter solution processor
+lsclear,all ! Delete all static loads
+lsdele,all ! Delete all load steps
+
+! Reapply pin-pin boundary conditions
+d,NODE(0,0,0),ux,0,,,,uy,uz,rotx,rotz
+d,NODE(l,0,0),ux,0,,,,uy,uz,rotx,rotz
+
 antype,transient ! Set dynamic analysis
+arclen,off
 nlgeom,on ! Set geometric nonlinearities on
 deltim,1/(kPeriod*omega_) ! Set time step size based on the natural frequency and kPeriod multiplier
 alphad,alphad ! Set the mass damping ratio
@@ -90,6 +129,7 @@ kbc,0 ! Set ramped loading
 lumpm,0 ! Do not use the lumped mass approximation
 outres,all,all ! Make sure all data is outputted
 outres,svar,all ! REALLY all data, this time.
+ncnv,0 ! Do not stop executing solution and wait for convergence
 
 ! Iterate over all load steps:
 *do,ii,1,numLoadSteps
@@ -115,21 +155,24 @@ Total Expected TIME: %g
 lssolve,1,numLoadSteps,1
 
 ! Send data back to Maple
+finish
 /post26
-nsol,2,NODE(L/2, 0, a0),u,z
+nsol,3,NODE(L/2, 0, a0),u,z
+plvar,3
 
 ! Place the time and displacement data into new variables
-vget,time,1
-vget,dz,2
+vget,time2,1
+vget,dz2,3
 
 ! Open the output file, write the data, then close the output file
-*cfopen,'Snap2DOutput','csv'
-*vwrite,time(1),dz(1)
+*cfopen,'Snap2DOutputTransient','csv'
+*vwrite,time2(1),dz2(1)
 %G,%G
 *cfclos
 
 ! Create an animation (only visible in non-batch mode)
 /post1
+eplot
 /gline,all,-1 ! Remove element outlines (for sanity reasons)
 set,last
 view,snap ! Make sure that the view is in the right orientation
@@ -140,8 +183,14 @@ plns,s,x,0,1
 ! Calculate total number of frames required (the real time of the last load step multiplied by the number of frames per second, rounded down)
 numFrames = NINT(LoadSteps(numLoadSteps,1)*fps)
 
+! Export avi (required)
+/seg,singl,Snap,1/fps
+
 ! Create an animation of the previously displayed data
 antime,numFrames,1/fps,,1,1,1,numLoadSteps
 
 ! Make sure that the animation plays forward only
 anim,,1,1/fps
+
+! Save the database file
+save
