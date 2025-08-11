@@ -1,0 +1,9 @@
+! trying to figure out how to early-quit execution of a macro without closing Ansys
+*if,1,eq,1,then
+    *msg,ui,'test2'
+%C
+    /eof
+*endif
+
+*msg,ui,'test'
+%C

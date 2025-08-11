@@ -44,6 +44,18 @@ isbimodulus = Snap2DGeom(10)
 E2          = Snap2DGeom(11)
 beta        = Snap2DGeom(12)
 q0          = Snap2DGeom(13)
+anFlags     = Snap2DGeom(14)
+! anFlags is a bitmask containing various flags:
+! Bit 0 (1): Generate static solution
+! Bit 1 (2): Generate transient solution
+! Bit 2+ (4+): Reserved for future use
+
+*if,BTEST(anFlags,0),eq,0,and,BTEST(anFlags,1),eq,0,then
+    *msg,error,''
+No solution flags set. At least one solution is required.
+    rs
+    /eof ! stop the rest of the macro from executing
+*endif
 
 kPeriod = 5 !*(isbimodulus/2+1) ! Multiplier for the natural frequency; higher k gives better results at the cost of longer simulation time. We multiply the value by isBimodulus so that if the bimodulus model is used, more iterations are also used.
 
@@ -82,93 +94,98 @@ d,NODE(0,0,0),ux,0,,,,uy,uz,rotx,rotz
 d,NODE(l,0,0),ux,0,,,,uy,uz,rotx,rotz
 
 ! ---------- STATIC SOLUTION ---------- !
-/solu ! Enter solution processor
-antype,static ! Set static analysis
-nlgeom,on ! Set geometric nonlinearities on
-nsubst,50 ! Use 50 substeps minimum
-arclen,on,1 ! Turn on arc length method/set a maximum radius
-outres,all,all ! Make sure all data is outputted
-outres,svar,all ! REALLY all data, this time.
+*if,BTEST(anFlags,0),eq,1,then ! Check if first bit is set (implies static solution)
+    finish ! Close any previous processor
+    /solu ! Enter solution processor
+    antype,static ! Set static analysis
+    nlgeom,on ! Set geometric nonlinearities on
+    nsubst,50 ! Use 50 substeps minimum
+    arclen,on,1 ! Turn on arc length method/set a maximum radius
+    outres,all,all ! Make sure all data is outputted
+    outres,svar,all ! REALLY all data, this time.
 
-! Appy maximum static load
-sinloadbeam,q0,l,2
-solve
+    ! Appy maximum static load
+    sinloadbeam,q0,l,2
+    solve
 
-! Send data back to Maple (Static)
-/post26
-nsol,2,NODE(L/2, 0, a0),u,z
-plvar,2
+    ! Send data back to Maple (Static)
+    /post26
+    nsol,2,NODE(L/2, 0, a0),u,z
+    plvar,2
 
-! Place the time and displacement data into new variables
-vget,time,1
-vget,dz,2
+    ! Place the time and displacement data into new variables
+    vget,time,1
+    vget,dz,2
 
-! Open the output file, write the data, then close the output file
-*cfopen,'Snap2DOutputStatic','csv'
-*vwrite,time(1),dz(1)
-%G,%G
-*cfclos
+    ! Open the output file, write the data, then close the output file
+    *cfopen,'Snap2DOutputStatic','csv'
+    *vwrite,time(1),dz(1)
+    %G,%G
+    *cfclos
+*endif
 
 ! ---------- TRANSIENT SOLUTION ---------- !
-finish
-/solu ! Enter solution processor
-lsclear,all ! Delete all static loads
-lsdele,all ! Delete all load steps
+*if,BTEST(anFlags,1),eq,1,then ! Check if second bit is set (implies transient solution)
+    finish ! Close any previous processor
+    /solu ! Enter solution processor
+    lsclear,all ! Delete all static loads
+    lsdele,all ! Delete all load steps
 
-! Reapply pin-pin boundary conditions
-d,NODE(0,0,0),ux,0,,,,uy,uz,rotx,rotz
-d,NODE(l,0,0),ux,0,,,,uy,uz,rotx,rotz
+    ! Reapply pin-pin boundary conditions
+    d,NODE(0,0,0),ux,0,,,,uy,uz,rotx,rotz
+    d,NODE(l,0,0),ux,0,,,,uy,uz,rotx,rotz
 
-antype,transient ! Set dynamic analysis
-arclen,off
-nlgeom,on ! Set geometric nonlinearities on
-deltim,1/(kPeriod*omega_) ! Set time step size based on the natural frequency and kPeriod multiplier
-alphad,alphad ! Set the mass damping ratio
-betad,0 ! Set the stiffness damping ratio
-kbc,0 ! Set ramped loading
-lumpm,0 ! Do not use the lumped mass approximation
-outres,all,all ! Make sure all data is outputted
-outres,svar,all ! REALLY all data, this time.
-ncnv,0 ! Do not stop executing solution and wait for convergence
+    antype,transient ! Set dynamic analysis
+    arclen,off
+    nlgeom,on ! Set geometric nonlinearities on
+    deltim,1/(kPeriod*omega_) ! Set time step size based on the natural frequency and kPeriod multiplier
+    alphad,alphad ! Set the mass damping ratio
+    betad,0 ! Set the stiffness damping ratio
+    kbc,0 ! Set ramped loading
+    lumpm,0 ! Do not use the lumped mass approximation
+    outres,all,all ! Make sure all data is outputted
+    outres,svar,all ! REALLY all data, this time.
+    ncnv,0 ! Do not stop executing solution and wait for convergence
 
-! Iterate over all load steps:
-*do,ii,1,numLoadSteps
-    ! - Applying loading
-    sinloadbeam,LoadSteps(ii,2),l,2
+    ! Iterate over all load steps:
+    *do,ii,1,numLoadSteps
+        ! - Applying loading
+        sinloadbeam,LoadSteps(ii,2),l,2
 
-    ! - At a certain time
-    time,LoadSteps(ii,1)
+        ! - At a certain time
+        time,LoadSteps(ii,1)
 
-    ! - Write to the load step file
-    lswrite,ii
+        ! - Write to the load step file
+        lswrite,ii
 
-    ! - Update the interface with the loading
-    *msg,ui,ii,numLoadSteps
-Number of load steps inputted: %I of %G
-*enddo
+        ! - Update the interface with the loading
+        *msg,ui,ii,numLoadSteps
+    Number of load steps inputted: %I of %G
+    *enddo
 
-! Update the interface predicting the amount of time (the variable) the simulation will take
-*msg,ui,LoadSteps(numLoadSteps,1)
-Total Expected TIME: %g
+    ! Update the interface predicting the amount of time (the variable) the simulation will take
+    *msg,ui,LoadSteps(numLoadSteps,1)
+    Total Expected TIME: %g
 
-! Solve all load steps
-lssolve,1,numLoadSteps,1
+    ! Solve all load steps
+    lssolve,1,numLoadSteps,1
 
-! Send data back to Maple
-finish
-/post26
-nsol,3,NODE(L/2, 0, a0),u,z
-plvar,3
+    ! Send data back to Maple
+    finish
+    /post26
+    nsol,3,NODE(L/2, 0, a0),u,z
+    plvar,3
 
-! Place the time and displacement data into new variables
-vget,time2,1
-vget,dz2,3
+    ! Place the time and displacement data into new variables
+    vget,time2,1
+    vget,dz2,3
 
-! Open the output file, write the data, then close the output file
-*cfopen,'Snap2DOutputTransient','csv'
-*vwrite,time2(1),dz2(1)
-%G,%G
-*cfclos
+    ! Open the output file, write the data, then close the output file
+    *cfopen,'Snap2DOutputTransient','csv'
+    *vwrite,time2(1),dz2(1)
+    %G,%G
+    *cfclos
+*endif
 
 ! Create an animation (only visible in non-batch mode)
 /post1
@@ -176,6 +193,7 @@ eplot
 /gline,all,-1 ! Remove element outlines (for sanity reasons)
 set,last
 view,snap ! Make sure that the view is in the right orientation
+view,side ! DEBUG
 
 ! Plot stress in x-direction
 plns,s,x,0,1
