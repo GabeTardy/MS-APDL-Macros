@@ -193,7 +193,6 @@ eplot
 /gline,all,-1 ! Remove element outlines (for sanity reasons)
 set,last
 view,snap ! Make sure that the view is in the right orientation
-view,side ! DEBUG
 
 ! Plot stress in x-direction
 plns,s,x,0,1
