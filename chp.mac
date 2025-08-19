@@ -3,7 +3,7 @@ rs
 /PBC,ALL, ,1
 /PSYMB,DOT,1
 
-n = 5
+n = 2
 ExT = 10000e3
 ExC = n*ExT
 
@@ -12,7 +12,7 @@ h = 1
 h2 = h/(sqrt(n) + 1) ! compression zone height
 h1 = h*sqrt(n)/(sqrt(n) + 1)! tensile zone height
 
-elsize = 0.025! 05 !0.05
+elsize = 0.008 !25! 05 !0.05
 epsilon = 10e-6
 
 *if,n,gt,1,then
@@ -23,6 +23,7 @@ epsilon = 10e-6
 
 ! set up area
 /prep7
+ERESX,NO ! gabe edit 2025 ????? does this do what i want?
 k,,-L,-h1
 k,,L,-h1
 k,,L,0
@@ -40,10 +41,10 @@ nut = 0
 nuc = 0 !Ec/Et*nut
 
 ! set material = usermat
-tb,user,1,1,4
+tb,user,1,1,5
 tbtemp,0
-tbdata,1,ExT,ExC,nut,nuc
-tb,state,1,,5
+tbdata,1,ExT,ExC,nut,nuc,0
+tb,state,1,,7
 
 ! set material = cast iron
 ! mp,ex,1,ExA
@@ -86,8 +87,8 @@ amesh,all
 ! set displacement bc
 /solu
 ! Pin-roller (SS)
-d,NODE(-L,0,0),ux,0,,,,uy,rotx
-d,NODE(L,0,0),uy,0,,,,rotx
+d,NODE(-L,0,0),ux,0,,,,uy
+d,NODE(L,0,0),uy,0
 
 ! Fixed-fixed (NOT SS)
 ! d,NODE(-L,0,0),all
