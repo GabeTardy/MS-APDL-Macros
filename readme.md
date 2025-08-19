@@ -16,8 +16,10 @@ git clone https://github.com/GabeTardy/MS-APDL-Macros.git
 
 ### Development Requirements
 
-- Ansys Mechanical APDL
+- Ansys Mechanical APDL 2025R2+
+- Maplesoft Maple 2025.1+
 - [APDL Language Support](https://marketplace.visualstudio.com/items?itemName=ekibun.apdl-language-support) for VS Code
+- Recommended: [Modern Fortran](https://marketplace.visualstudio.com/items?itemName=fortran-lang.linter-gfortran) for VS Code
 
 ### Usage
 
