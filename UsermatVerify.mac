@@ -1,0 +1,121 @@
+! UsermatVerify.mac
+! This macro is used to verify the bimodulus material model.
+! Various beam problems can be tested. 
+rs
+/output,'UsermatVerify','out'
+/triad,off
+view,iso
+/replot
+!/gline,all,-1
+
+case = 4
+! Case 1 - Cantilever beam, L = 10, point load at end
+! Case 2 - Cantilever beam, L = 10, distributed load
+! Case 3 - Simply supported beam, L = 10, distributed load
+! Case 4 - Simply supported beam, L = 10, point load at center
+! Case 5 - Cantilever beam, L = 2, point load at end (dominated by shear)
+! Case 6 - Simply supported beam, L = 10, moment at end
+method = 1 ! 1 - first invariant Liu, 2 - first invariant atan
+betaK = 0.1 ! beta for first invariant atan
+
+Et = 45e6
+Ec = 100e6
+
+Eq = (sqrt(Et) + sqrt(Ec))*(sqrt(Et) + sqrt(Ec))
+Er = 4*Et*Ec/Eq
+
+nut = 0
+nuc = 0 !Ec/Et*nut
+
+/prep7
+*get,timeOrig,active,,time,wall
+/upf,usermat.F
+
+k
+*if,case,eq,5,then
+    k,2,2,0,0
+    l,1,2
+*else
+    k,2,5,0,0
+    k,3,10,0,0
+    l,1,2
+    l,2,3
+*endif
+
+et,1,189
+sectype,1,beam,rect,main,0
+secdata,1,1,20,2 ! add extra integration points thorughout height to show behavior
+lesize,all,,,100
+lmesh,all
+
+! Boundary conditions
+/solu
+bimodulus,Et,Ec,nut,nuc,method,betaK
+
+*if,case,eq,1,then
+    d,NODE(0,0,0),all,0
+    f,NODE(10,0,0),fy,-1
+*elseif,case,eq,2,or,case,eq,3,then
+    sfbeam,all,2,pres,1
+
+    *if,case,eq,2,then
+        ! fixed end
+        d,NODE(0,0,0),all,0
+    *else
+        ! simply supported
+        d,NODE(0,0,0),ux,0, , , ,uy,uz,rotx,roty
+        d,NODE(10,0,0),ux,0, , , ,uy,uz,rotx,roty
+    *endif
+*elseif,case,eq,4,then
+    d,NODE(0,0,0),ux,0, , , ,uy,uz,rotx,roty
+    d,NODE(10,0,0),ux,0, , , ,uy,uz,rotx,roty
+    f,NODE(5,0,0),fy,-1
+*elseif,case,eq,5,then
+    d,NODE(0,0,0),all,0
+    f,NODE(2,0,0),fy,-1
+*elseif,case,eq,6,then
+    d,NODE(0,0,0),ux,0, , , ,uy,uz,rotx,roty
+    d,NODE(10,0,0),ux,0, , , ,uy,uz,rotx,roty
+    f,NODE(10,0,0),mz,1
+*endif
+
+! Solution options
+nlgeom,on
+time,1
+nsubst,100
+arclen,on,1
+autots,off
+solve
+
+/post1
+/gline,all,-1
+/view,1,0.02,0,1
+pldisp,2
+set,last
+/eshape,1
+/dscale,all,auto
+/replot
+plnsol,s,x,2,1
+
+*get,timeFinal,active,,time,wall
+dTime = 3600*(timeFinal - timeOrig)
+
+*msg,ui,dTime
+Time taken: %g
+
+*cfopen,'UsermatVerify','csv'
+*vwrite, 'x', 'v'
+%C,%C
+
+*vget,locx,node,1,loc,x,,,0
+*vget,dispv,node,1,u,y,,,0
+*vwrite, locx(1), dispv(1)
+%G,%G
+
+*cfclos
+
+set,first
+etable,method,svar,1
+etable,toc,svar,2
+pletab,toc
+
