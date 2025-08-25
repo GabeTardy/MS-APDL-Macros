@@ -9,3 +9,5 @@ Results/
 !.gitignore
 !apdl*.bat
 !Snap2DMaple.mw
+!SnapSupplemental.mw
+!*.mpl
